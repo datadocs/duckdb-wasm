@@ -15,7 +15,7 @@ endif()
 set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
-set(DUCKDB_EXTENSIONS "json;core_functions")
+set(DUCKDB_EXTENSIONS "json;core_functions;excel;datadocs")
 # Escape semicolons in DUCKDB_EXTENSIONS before passing to ExternalProject_Add
 string(REPLACE ";" "$<SEMICOLON>" DUCKDB_EXTENSIONS_PACKED "${DUCKDB_EXTENSIONS}")
 
@@ -61,8 +61,11 @@ ExternalProject_Add(
     <INSTALL_DIR>/lib/libduckdb_utf8proc.a
     <INSTALL_DIR>/lib/libduckdb_fastpforlib.a
     <INSTALL_DIR>/lib/libparquet_extension.a
+    # <INSTALL_DIR>/lib/libfts_extension.a
     <INSTALL_DIR>/lib/libcore_functions_extension.a
-    <INSTALL_DIR>/lib/libjson_extension.a)
+    <INSTALL_DIR>/lib/libexcel_extension.a
+    <INSTALL_DIR>/lib/libjson_extension.a
+    <INSTALL_DIR>/lib/libdatadocs_extension.a)
 
 ExternalProject_Get_Property(duckdb_ep install_dir)
 ExternalProject_Get_Property(duckdb_ep binary_dir)
@@ -121,6 +124,11 @@ add_library(duckdb_core_functions STATIC IMPORTED)
 set_property(TARGET duckdb_core_functions PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libcore_functions_extension.a)
 target_include_directories(duckdb_core_functions INTERFACE ${DUCKDB_SOURCE_DIR}/extension/json/include)
 
+add_library(duckdb_datadocs STATIC IMPORTED)
+set_property(TARGET duckdb_datadocs PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libdatadocs_extension.a)
+target_include_directories(duckdb_datadocs INTERFACE ${DUCKDB_SOURCE_DIR}/extension/datadocs/include)
+
 add_dependencies(duckdb duckdb_ep)
 add_dependencies(duckdb_parquet duckdb_ep)
 add_dependencies(duckdb_json duckdb_ep)
+add_dependencies(duckdb_datadocs duckdb_ep)

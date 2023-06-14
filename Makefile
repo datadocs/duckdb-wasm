@@ -28,6 +28,7 @@ JS_FILTER=
 
 EXTENSION_CACHE_DIR="${ROOT_DIR}/.ccache/extension"
 JSON_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/json"
+DATADOCS_EXTENSION_CACHE_FILE="${EXTENSION_CACHE_DIR}/datadocs"
 
 cpp_lib: lib_tests
 
@@ -226,6 +227,9 @@ wasm_caches: $(DUCKDB_SOURCES)
 	mkdir -p ${CACHE_DIRS}
 ifeq (${DUCKDB_JSON}, 1)
 	touch ${JSON_EXTENSION_CACHE_FILE}
+endif
+ifeq (${DUCKDB_DATADOCS}, 1)
+	touch ${DATADOCS_EXTENSION_CACHE_FILE}
 endif
 
 wrapped_wasm_caches:
