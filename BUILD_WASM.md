@@ -1,12 +1,15 @@
 # BUILDING DUCKDB-WASM ON GCP
 
-View the video here to see the entire workflow of how these commands and actions are done. For a brand new machine, it takes about 25m to build everything. On an existing machine with the prerequisites installed it should take 10m or less.
+View the video here to see the entire workflow of how these commands and steps are done using GCP: https://youtu.be/yBhYkIRuoWQ.
+
+For a brand new machine, it takes about 25m to build everything. On an existing machine with the prerequisites installed it should take 10m or less.
 ​
 ## Starting VM
-The VM is currently Boot Disk: Ubuntu 20.04, 40GB SSD | Machine type: e2-standard-8 (4 cores) | Network tags: http-server, https-server, duckdb-wasm. 
-- Visit dukcdb-wasm VM url https://console.cloud.google.com/compute/instancesDetail/zones/us-west1-b/instances/duckdb-wasm2?project=datadocs-163219. 
-- START the VM
-- Open SSH to connect to VM
+You may use a free GCP or AWS account to following the below installation. The below has been tested using GCP (if you are a current developer with GCP access use [this link](https://console.cloud.google.com/compute/instancesDetail/zones/us-west1-b/instances/duckdb-wasm2?project=datadocs-163219) to view the instance).
+
+The VM currently has Boot Disk: Ubuntu 20.04, 40GB SSD.
+
+Make sure Port 9002 is open. 
 ​
 ## Prerequisites (Linux):
 Install package following commands:
@@ -91,12 +94,10 @@ DUCKDB_EXCEL=1 DUCKDB_JSON=1 DUCKDB_DATADOCS=1 make app_start
 ```
 ​
 ## Running Duckdb-shell in browser
-- Finding `external IP address` in `duckdb-wasm` VM instance (VM page https://console.cloud.google.com/compute/instancesDetail/zones/us-west1-b/instances/duckdb-wasm?project=datadocs-163219)
+- Find the external IP address for the instance. Copy the IP to your clipboard.
 - Open browser and visit url: `http://<EXTERNAL_IP_ADDRESS>:9002/` (EG: http://35.247.34.76:9002/)
-- 
-- Running query with `ingest_file` function in duckdb-shell. Example query:
+- Run the query with `ingest_file` function in duckdb-shell. Example query:
 ```query
-
 # remote
 SELECT * from ingest_file("https://support.staffbase.com/hc/en-us/article_attachments/360009197031/username.csv");
 
@@ -121,5 +122,3 @@ duckdb-browser-eh.worker.63dcc272ecdd5657c10a.js:1 RuntimeError: unreachable
     at 04ce4786:0x66ab48
     at 04ce4786:0xc05e5
 ```
-
-## Shut down the machine when you are finished as it's a large machine.
