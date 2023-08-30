@@ -50,8 +50,6 @@ curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh
 git clone https://github.com/datadocs/duckdb-wasm.git
 cd duckdb-wasm
 git submodule update --init
-cd submodules/duckdb
-git apply ../../duckdb.patch
 cd ~
 ```
 ​
@@ -77,6 +75,7 @@ git checkout .
 git pull origin ingest
 git apply ../../duckdb.patch
 cd ../../
+git apply fix.patch
 ​
 # clean previous build
 make clean
