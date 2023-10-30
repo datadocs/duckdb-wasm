@@ -735,6 +735,10 @@ WebDB::WebDB(WebTag)
       connections_(),
       file_stats_(std::make_shared<io::FileStatisticsRegistry>()),
       pinned_web_files_() {
+    init_console_log();
+    console_log("wasmfs_create_opfs_backend");
+    wasmfs_create_opfs_backend();
+
     auto webfs = std::make_shared<io::WebFileSystem>(config_);
     webfs->ConfigureFileStatistics(file_stats_);
     file_page_buffer_ = std::make_shared<io::FilePageBuffer>(std::move(webfs));
