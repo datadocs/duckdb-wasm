@@ -1,3 +1,13 @@
+# flag files
+/check_duckdb
+/wasm_setup
+
+# log files
+/*.log
+
+# MacOS system files
+._*
+
 *.tgz
 /.deploy
 /perf.data*
