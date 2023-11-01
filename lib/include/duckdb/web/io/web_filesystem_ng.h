@@ -1,0 +1,250 @@
+#ifndef INCLUDE_DUCKDB_WEB_IO_WEB_FILESYSTEM_NG_H_
+#define INCLUDE_DUCKDB_WEB_IO_WEB_FILESYSTEM_NG_H_
+
+#include <atomic>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
+#include <stack>
+
+#include "arrow/io/buffered.h"
+#include "arrow/result.h"
+#include "arrow/status.h"
+#include "duckdb/common/constants.hpp"
+#include "duckdb/common/file_system.hpp"
+#include "duckdb/common/vector.hpp"
+#include "duckdb/web/config.h"
+#include "duckdb/web/io/file_stats.h"
+#include "duckdb/web/io/readahead_buffer.h"
+#include "duckdb/web/io/web_filesystem.h"
+#include "duckdb/web/utils/parallel.h"
+#include "duckdb/web/utils/wasm_response.h"
+#include "nonstd/span.h"
+
+namespace duckdb {
+namespace web {
+namespace io {
+
+/// @brief Next generation Web File System based on OPFS
+/// https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system
+class WebFileSystemNG : public duckdb::FileSystem {
+   public:
+    class WebFileNG {
+        friend class WebFileSystemNG;
+
+       protected:
+        /// The filesystem
+        WebFileSystemNG &filesystem_;
+        /// The file identifier
+        const uint32_t file_id_;
+        /// The file path
+        std::string file_name_;
+        /// The handle count
+        size_t handle_count_;
+        /// The file mutex
+        SharedMutex file_mutex_ = {};
+        /// The file size
+        std::optional<uint64_t> file_size_ = 0;
+
+        /// XXX Make chunked to upgrade from url to cached version
+        std::optional<WebFileSystem::DataBuffer> data_buffer_ = std::nullopt;
+        /// The data URL (if any)
+        std::optional<std::string> data_url_ = std::nullopt;
+
+        /// Buffered http file for writing: file is a buffered HTTP/S3 and should be written to data_url_ on closing
+        bool buffered_http_file_ = false;
+        /// The extensionOptions at time of opening the http file as buffer
+        std::optional<DuckDBConfigOptions> buffered_http_config_options_ = std::nullopt;
+
+        /// The file stats
+        std::shared_ptr<io::FileStatisticsCollector> file_stats_ = nullptr;
+
+       public:
+        /// Constructor
+        WebFileNG(WebFileSystemNG &filesystem, uint32_t file_id, std::string_view file_name)
+            : filesystem_(filesystem), file_id_(file_id), file_name_(file_name), handle_count_(0) {}
+
+        /// Close the file
+        void Close();
+        /// Get the file info as json
+        rapidjson::Value WriteInfo(rapidjson::Document &doc) const;
+        /// Get the file name
+        auto &GetFileSystem() const { return filesystem_; }
+        /// Get the file name
+        auto &GetFileName() const { return file_name_; }
+        /// Get the data URL
+        auto &GetDataURL() const { return data_url_; }
+    };
+
+    class WebFileHandleNG : public duckdb::FileHandle {
+        friend class WebFileSystemNG;
+
+       protected:
+        /// The file
+        std::shared_ptr<WebFileNG> file_;
+        /// The readahead (if resolved)
+        ReadAheadBuffer *readahead_;
+        /// The position
+        std::atomic<uint64_t> position_;
+
+        /// Close the file
+        void Close() override;
+
+       public:
+        /// Constructor
+        WebFileHandleNG(std::shared_ptr<WebFileNG> file)
+            : duckdb::FileHandle(file->GetFileSystem(), file->GetFileName()),
+              file_(file),
+              readahead_(nullptr),
+              position_(0) {
+            ++file_->handle_count_;
+        }
+        /// Delete copy constructor
+        WebFileHandleNG(const WebFileHandleNG &) = delete;
+        /// Destructor
+        virtual ~WebFileHandleNG() { Close(); }
+        /// Get the file name
+        auto &GetName() const { return file_->file_name_; }
+        /// Resolve readahead
+        ReadAheadBuffer *ResolveReadAheadBuffer(std::shared_lock<SharedMutex> &file_guard);
+    };
+
+   protected:
+    /// The config
+    std::shared_ptr<WebDBConfig> config_ = {};
+    /// The filesystem mutex
+    LightMutex fs_mutex_ = {};
+    /// The files by id
+    std::unordered_map<uint32_t, std::shared_ptr<WebFileNG>> files_by_id_ = {};
+    /// The files by name
+    std::unordered_map<std::string, std::shared_ptr<WebFileNG>> files_by_name_ = {};
+    /// The files by url
+    std::unordered_map<std::string, std::shared_ptr<WebFileNG>> files_by_url_ = {};
+    /// The next file id
+    uint32_t next_file_id_ = 0;
+    /// The thread-local readahead buffers
+    std::unordered_map<uint32_t, std::unique_ptr<ReadAheadBuffer>> readahead_buffers_ = {};
+    /// The file statistics
+    std::shared_ptr<io::FileStatisticsRegistry> file_statistics_;
+    /// Cache epoch for synchronization of JS caches
+    std::atomic<uint32_t> cache_epoch_ = 1;
+
+    /// Allocate a file id.
+    /// XXX This could of course overflow....
+    /// Make this a uint64 with emscripten BigInts maybe.
+    inline uint32_t AllocateFileID() { return ++next_file_id_; }
+    /// Invalidate readaheads
+    void InvalidateReadAheads(size_t file_id, std::unique_lock<SharedMutex> &file_guard);
+
+   public:
+    /// Constructor
+    WebFileSystemNG(std::shared_ptr<WebDBConfig> config);
+    /// Destructor
+    virtual ~WebFileSystemNG();
+    /// Delete copy constructor
+    WebFileSystemNG(const WebFileSystemNG &other) = delete;
+
+    /// Get the config
+    auto Config() const { return config_; }
+    /// Load the current cache epoch
+    auto LoadCacheEpoch() const { return cache_epoch_.load(std::memory_order_relaxed); }
+    /// Get a file info as JSON string
+    inline WebFileNG *GetFile(uint32_t file_id) const {
+        return files_by_id_.count(file_id) ? files_by_id_.at(file_id).get() : nullptr;
+    }
+    /// Write the global file info as a JSON
+    rapidjson::Value WriteGlobalFileInfo(rapidjson::Document &doc, uint32_t cache_epoch);
+    /// Write the file info as JSON
+    rapidjson::Value WriteFileInfo(rapidjson::Document &doc, uint32_t file_id, uint32_t cache_epoch);
+    /// Write the file info as JSON
+    rapidjson::Value WriteFileInfo(rapidjson::Document &doc, std::string_view file_name, uint32_t cache_epoch);
+
+    /// Try to drop a specific file
+    bool TryDropFile(std::string_view file_name);
+    /// Drop all files without references (including buffers)
+    void DropDanglingFiles();
+    /// Configure file statistics
+    void ConfigureFileStatistics(std::shared_ptr<FileStatisticsRegistry> registry);
+    /// Collect file statistics
+    void CollectFileStatistics(std::string_view path, std::shared_ptr<FileStatisticsCollector> collector);
+
+    // Increment the Cache epoch, this allows detecting stale fileInfoCaches from JS
+    void IncrementCacheEpoch();
+
+   public:
+    /// Open a file
+    duckdb::unique_ptr<duckdb::FileHandle> OpenFile(const string &url, uint8_t flags, FileLockType lock,
+                                                    FileCompressionType compression,
+                                                    FileOpener *opener = nullptr) override;
+    /// Read exactly nr_bytes from the specified location in the file. Fails if nr_bytes could not be read. This is
+    /// equivalent to calling SetFilePointer(location) followed by calling Read().
+    void Read(duckdb::FileHandle &handle, void *buffer, int64_t nr_bytes, duckdb::idx_t location) override;
+    /// Write exactly nr_bytes to the specified location in the file. Fails if nr_bytes could not be read. This is
+    /// equivalent to calling SetFilePointer(location) followed by calling Write().
+    void Write(duckdb::FileHandle &handle, void *buffer, int64_t nr_bytes, duckdb::idx_t location) override;
+    /// Read nr_bytes from the specified file into the buffer, moving the file pointer forward by nr_bytes. Returns the
+    /// amount of bytes read.
+    int64_t Read(duckdb::FileHandle &handle, void *buffer, int64_t nr_bytes) override;
+    /// Write nr_bytes from the buffer into the file, moving the file pointer forward by nr_bytes.
+    int64_t Write(duckdb::FileHandle &handle, void *buffer, int64_t nr_bytes) override;
+
+    /// Returns the file size of a file handle, returns -1 on error
+    int64_t GetFileSize(duckdb::FileHandle &handle) override;
+    /// Returns the file last modified time of a file handle, returns timespec with zero on all attributes on error
+    time_t GetLastModifiedTime(duckdb::FileHandle &handle) override;
+    /// Truncate a file to a maximum size of new_size, new_size should be smaller than or equal to the current size of
+    /// the file
+    void Truncate(duckdb::FileHandle &handle, int64_t new_size) override;
+
+    /// Check if a directory exists
+    bool DirectoryExists(const std::string &directory) override;
+    /// Create a directory if it does not exist
+    void CreateDirectory(const std::string &directory) override;
+    /// Recursively remove a directory and all files in it
+    void RemoveDirectory(const std::string &directory) override;
+    /// List files in a directory, invoking the callback method for each one with (filename, is_dir)
+    bool ListFiles(const std::string &directory, const std::function<void(const std::string &, bool)> &callback,
+                   FileOpener *opener = nullptr) override;
+    /// Move a file from source path to the target, StorageManager relies on this being an atomic action for ACID
+    /// properties
+    void MoveFile(const std::string &source, const std::string &target) override;
+    /// Check if a file exists
+    bool FileExists(const std::string &filename) override;
+    /// Remove a file from disk
+    void RemoveFile(const std::string &filename) override;
+    // /// Path separator for the current file system
+    // std::string PathSeparator() override;
+    // /// Join two paths together
+    // std::string JoinPath(const std::string &a, const std::string &path) override;
+    /// Sync a file handle to disk
+    void FileSync(duckdb::FileHandle &handle) override;
+
+    /// Runs a glob on the file system, returning a list of matching files
+    vector<std::string> Glob(const std::string &path, FileOpener *opener = nullptr) override;
+
+    /// Set the file pointer of a file handle to a specified location. Reads and writes will happen from this location
+    void Seek(FileHandle &handle, idx_t location) override;
+    /// Reset a file to the beginning (equivalent to Seek(handle, 0) for simple files)
+    void Reset(FileHandle &handle) override;
+    /// Get the current position within the file
+    idx_t SeekPosition(FileHandle &handle) override;
+    /// Whether or not we can seek into the file
+    bool CanSeek() override;
+    /// Whether or not the FS handles plain files on disk. This is relevant for certain optimizations, as random reads
+    /// in a file on-disk are much cheaper than e.g. random reads in a file over the network
+    bool OnDiskFile(FileHandle &handle) override;
+
+   public:
+    /// Get a web filesystem
+    static WebFileSystemNG *Get();
+
+   protected:
+    /// Return the name of the filesytem. Used for forming diagnosis messages.
+    std::string GetName() const override;
+};
+
+}  // namespace io
+}  // namespace web
+}  // namespace duckdb
+
+#endif

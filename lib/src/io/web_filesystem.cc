@@ -13,6 +13,7 @@
 #include "arrow/status.h"
 #include "arrow/type_fwd.h"
 #include "duckdb/common/file_system.hpp"
+#include "duckdb/web/debug.h"
 #include "duckdb/web/io/glob.h"
 #include "duckdb/web/io/web_filesystem.h"
 #include "duckdb/web/utils/debug.h"
