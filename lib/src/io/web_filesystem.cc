@@ -155,7 +155,7 @@ RT_FN(void duckdb_web_fs_glob(const char *path, size_t pathLen), {
 RT_FN(void duckdb_web_fs_file_move(const char *from, size_t fromLen, const char *to, size_t toLen), {
     NATIVE_FS->MoveFile(std::string{from, fromLen}, std::string{to, toLen});
 });
-RT_FN(bool duckdb_web_fs_file_exists(const char *path, size_t pathLen), {
+RT_FN(bool duckdb_web_fs_file_exists(const char *path, size_t pathLen, const char *url, size_t urlLen), {
     return NATIVE_FS->FileExists(std::string{path, pathLen});
 });
 #undef RT_FN
@@ -639,8 +639,9 @@ duckdb::unique_ptr<duckdb::FileHandle> WebFileSystem::OpenFile(const string &url
     fs_guard.unlock();
     std::unique_lock<SharedMutex> file_guard{file->file_mutex_};
 
+    auto protocol = file->data_protocol_;
     // Try to open the file (if necessary)
-    switch (file->data_protocol_) {
+    switch (protocol) {
         case DataProtocol::BUFFER:
             if (flags.OverwriteExistingFile()) {
                 file->data_buffer_->Resize(0);
@@ -1002,8 +1003,15 @@ void WebFileSystem::MoveFile(const std::string &source, const std::string &targe
 /// Check if a file exists
 bool WebFileSystem::FileExists(const std::string &filename, optional_ptr<FileOpener> opener) {
     auto iter = files_by_name_.find(filename);
-    if (iter != files_by_name_.end()) return true;
-    return duckdb_web_fs_file_exists(filename.c_str(), filename.size());
+    std::string dataurl;
+    if (iter != files_by_name_.end()) {
+        std::shared_ptr<WebFileSystem::WebFile> file = iter->second;
+        dataurl = (file->data_url_.value_or(""));
+        // we have to recheck OPFS files even it is found 
+        // (because the file handle may has flag `emptyAsAbsent`)
+        if (file->data_protocol_ != DataProtocol::BROWSER_FSACCESS) return true;
+    }
+    return duckdb_web_fs_file_exists(filename.c_str(), filename.size(), dataurl.c_str(), dataurl.size());
 }
 /// Remove a file from disk
 void WebFileSystem::RemoveFile(const std::string &filename, optional_ptr<FileOpener> opener) {}
