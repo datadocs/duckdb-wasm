@@ -15,17 +15,17 @@ usage() {
   local bin;
   bin="$(basename "${BASH_SOURCE[0]}")";
   echo "";
-  echo "  Usage: $bin [--prod] [--duckdb] [...features]";
+  echo "  Usage: $bin [--release] [--duckdb] [...features]";
   echo "";
   echo "  Options:";
   echo "";
   echo "    --duckdb      rebuild duckdb core also";
-  echo '    --prod        build for production `-DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1`';
+  echo '    --release     build for release `-DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1`';
   echo "";
   echo "  Common Commands:";
   echo "";
-  echo "    $bin               # Build WASM file (eh) for daily development purpose";
-  echo "    $bin --prod all    # Build all WASM files (eh, mvp, coi) for release purpose";
+  echo "    $bin                # Build WASM file (eh) for daily development purpose";
+  echo "    $bin --release all  # Build all WASM files (eh, mvp, coi) for release purpose";
   echo "";
   exit 0;
 }
@@ -41,7 +41,7 @@ parse_args() {
 		arg="$1"; shift;
 		case "$arg" in
 			-h|--help|help) usage;;
-      --prod) build_type='relsize';;        # relperf
+      --release) build_type='relsize';;     # relperf
 			-dd|--dd|--duckdb) rebuild_duckdb=1;;
       -*) throw  "Unknown option '$arg'";;
       all) build_features=( eh mvp coi );;
@@ -64,6 +64,11 @@ for build_feature in "${build_features[@]}"; do
   execute ./scripts/wasm_build_lib.sh "$build_type" "$build_feature";
   target_wasm_files+=( "packages/duckdb-wasm/src/bindings/duckdb-$build_feature.wasm" );
 done
+
+pushd -- packages/duckdb-wasm >/dev/null || exit 1;
+execute pwd;
+execute yarn run build:release; 
+popd >/dev/null || exit 1;
 
 ls -alh "${target_wasm_files[@]}";
 echo "done: +${SECONDS}s"

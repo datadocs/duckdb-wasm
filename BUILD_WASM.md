@@ -1,3 +1,70 @@
+# RAPIDLY BUILDING DUCKDB-WASM
+
+Updated at: 2023-11-03
+
+The building manual in this section is only for Ubuntu and Mac OS.
+Feel free to ask [me](https://github.com/hangxingliu) in the Slack if you encounter any
+problems during the build
+
+## Prerequisites
+
+``` bash
+# ===============
+# Ubuntu:
+sudo apt update && sudo apt install -y build-essential cmake git ccache;
+# Install Node.js manually from https://nodejs.org/
+# ===============
+# Mac OS:
+brew install make cmake git ccache node
+# ===============
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
+```
+
+## First Build
+
+``` bash
+git clone https://github.com/datadocs/duckdb-wasm.git
+cd duckdb-wasm
+git submodule update --init --depth=1
+yarn install # OR npm install
+source /path/to/your/emsdk/emsdk_env.sh # REMEMBER to replace the path here
+./scripts/datadocs_fast_rebuild.sh all
+# NOTICE: The first complete build can take a long time, the reference times are here:
+# Base hardware information: MacBook Pro 2019 (2.6GHz 6-Core Intel i7)
+#
+#   ~7m  for a brand new environment
+#   ~6m  for a new environment but built emscripten before
+#   ~24m for a brand new environment with the option `--release`
+#
+# NOTICE: please ensure your network is stable and can access the following domains:
+# - *.github.com
+# - *.githubusercontent.com
+# - *.yarnpkg.com
+```
+
+## Subsequent Builds
+
+``` bash
+./scripts/datadocs_fast_rebuild.sh
+```
+
+## Build for Release
+
+``` bash
+./scripts/datadocs_fast_rebuild.sh --release all
+# You can take a break after executing this command, because it can take a long time
+```
+
+## More Tips
+
+You can mount a RAMDISK at `/path/to/your/duckdb-wasm/build` to improve the building process.
+The minimum size of this RAMDISK is **4GB**, the recommanded size of it is **8GB** (Becuase you may need to build for release and dev)
+
+
 # BUILDING DUCKDB-WASM ON GCP
 
 View the video here to see the entire workflow of how these commands and steps are done using GCP: https://youtu.be/yBhYkIRuoWQ.
