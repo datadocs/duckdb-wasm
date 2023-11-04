@@ -11,6 +11,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(ignoreMe "${DUCKDB_WASM_VERSION}")
 
+# We need to enable this option if we need to implement async operation (E.g., async file system)
+# for DuckDB in the future.
+#
+# Asyncify lets synchronous C or C++ code interact with asynchronous JavaScript. 
+# References:
+# https://emscripten.org/docs/porting/asyncify.html
+# https://web.dev/articles/asyncify
+# 
+# But Asyncify has some disadvantage now (2023-11-03), just like:
+# 1. It is not compatible with `-f wasm-exceptions`
+# 2. `-O3` optimization option is necessary for all build mode
+#    Because an unoptimized builds with Asyncify are very large and 
+#    it can cause a `local count too large` error in the frontend.
+# 
+set(ENABLE_EMSCRIPTEN_ASYNCIFY OFF)
+
 option(DUCKDB_WASM_LOADABLE_EXTENSIONS "Build with loadable extensions" OFF)
 
 if(DEFINED ENV{DUCKDB_WASM_LOADABLE_EXTENSIONS})
@@ -96,13 +112,19 @@ endif ()
 set(DUCKDB_PLATFORM "wasm_mvp")
 
 if(EMSCRIPTEN)
+  if(ENABLE_EMSCRIPTEN_ASYNCIFY)
+    set(DEFAULT_WASM_OPTIMIZATION_OPT "-O3")
+  else()
+    set(DEFAULT_WASM_OPTIMIZATION_OPT "-O0")
+  endif()
+
   # Release build
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
     # ... with min size
     if(WASM_MIN_SIZE)
       set(CMAKE_CXX_FLAGS_RELEASE "-Oz")
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -Oz")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ")
     else()
       # ... with max performance
       set(CMAKE_CXX_FLAGS_RELEASE "-O3")
@@ -112,13 +134,7 @@ if(EMSCRIPTEN)
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     # ... with fast linking
     if(WASM_FAST_LINKING)
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
-      # set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
-      # We have to use Asyncify:
-      # https://emscripten.org/docs/porting/asyncify.html
-      # then we can use -O0 optimization option,
-      # Because it can produce an issue when the frontend is compiling WASM file:
-      # Compiling function #14817:"unsigned long long ..." failed: local count too large
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
     endif()
   # Debug build
   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -129,14 +145,14 @@ if(EMSCRIPTEN)
       -g")
     # ... with fast linking
     if(WASM_FAST_LINKING)
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O0")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
     endif()
   endif()
 
   if(WITH_WASM_EXCEPTIONS)
     set(DUCKDB_PLATFORM "wasm_eh")
-    # The option `-f wasm-exceptions` can works with `-s ASYNCIFY`.
-    # So we disabled the following config
+    # The option `-f wasm-exceptions` is not compatible with `-s ASYNCIFY`.
+    # So we may need to disable the config in the next line
     set(CMAKE_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1")
   else()
@@ -317,6 +333,9 @@ endif()
 
 # ---------------------------------------------------------------------------
 # Emscripten
+if(ENABLE_EMSCRIPTEN_ASYNCIFY)
+  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -s ASYNCIFY -s ASYNCIFY_IGNORE_INDIRECT=1")
+endif()
 
 # We need "-s WARN_ON_UNDEFINED_SYMBOLS=0" to instantiate the module with our
 # own imports.
