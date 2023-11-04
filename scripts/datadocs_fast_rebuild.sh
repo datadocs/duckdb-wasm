@@ -55,6 +55,19 @@ parse_args "${@}";
 # change the current directory to the script directory
 pushd "$( dirname -- "${BASH_SOURCE[0]}" )/.." >/dev/null || exit 1;
 
+
+#   ____               
+#  / ___|___  _ __ ___ 
+# | |   / _ \| '__/ _ \
+# | |__| (_) | | |  __/
+#  \____\___/|_|  \___|
+#region core
+
+execute mkdir -p .ccache/extension;
+execute touch .ccache/extension/excel;
+execute touch .ccache/extension/json;
+execute touch .ccache/extension/datadocs;
+
 # export ENABLE_DATADOCS_EXTENSION=OFF;
 for build_feature in "${build_features[@]}"; do
   [ -n "$rebuild_duckdb" ] && 
@@ -69,6 +82,9 @@ pushd -- packages/duckdb-wasm >/dev/null || exit 1;
 execute pwd;
 execute yarn run build:release; 
 popd >/dev/null || exit 1;
+
+#endregion core
+
 
 ls -alh "${target_wasm_files[@]}";
 echo "done: +${SECONDS}s"
