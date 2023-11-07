@@ -14,6 +14,7 @@ import {
     OpenedFile,
     readString,
 } from './runtime';
+import { registerAsyncMethodsIntoBrowserRuntime } from './runtime_browser_async_methods';
 import { assertOPFSHandle, OPFSFileHandle } from './opfs';
 import { DuckDBModule } from './duckdb_module';
 import * as udf from './udf_runtime';
@@ -674,5 +675,6 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
         udf.callScalarUDF(BROWSER_RUNTIME, mod, response, funcId, descPtr, descSize, ptrsPtr, ptrsSize);
     },
 };
+registerAsyncMethodsIntoBrowserRuntime(BROWSER_RUNTIME);
 
 export default BROWSER_RUNTIME;

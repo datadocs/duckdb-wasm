@@ -19,6 +19,7 @@
 #include "duckdb/web/utils/scope_guard.h"
 #include "duckdb/web/utils/thread.h"
 #include "duckdb/web/utils/wasm_response.h"
+#include "emscripten.h"
 #include "rapidjson/allocators.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
@@ -112,6 +113,12 @@ RT_FN(void *duckdb_web_fs_file_open(size_t file_id, uint8_t flags), {
     result->file_buffer = 0;
     return result.release();
 });
+// #ifdef EMSCRIPTEN
+// EM_ASYNC_JS(void*, duckdb_web_fs_file_open_async, (size_t file_id, uint8_t flags),
+//             { return globalThis.DUCKDB_RUNTIME.openFileAsync(Module, file_id, flags); });
+// #else
+// void *duckdb_web_fs_file_open_async(size_t file_id, uint8_t flags) { return nullptr; }
+// #endif
 RT_FN(void duckdb_web_fs_file_sync(size_t file_id), { NATIVE_FS->FileSync(GetOrOpen(file_id)); });
 RT_FN(void duckdb_web_fs_file_close(size_t file_id), {
     auto &infos = GetLocalState();
@@ -704,6 +711,10 @@ void WebFileSystem::Read(duckdb::FileHandle &handle, void *buffer, int64_t nr_by
     auto file_size = file_hdl.file_->file_size_;
     auto reader = static_cast<char *>(buffer);
     file_hdl.position_ = location;
+    init_console_log();
+    console_log("WebFSRead('%s', %lld bytes at %llu, currFileSize: %llu)",
+                //
+                handle.GetPath().c_str(), nr_bytes, location, file_size.value_or(0));
     while (nr_bytes > 0 && location < file_size) {
         auto n = Read(handle, reader, nr_bytes);
         reader += n;
@@ -777,11 +788,15 @@ int64_t WebFileSystem::Read(duckdb::FileHandle &handle, void *buffer, int64_t nr
 }
 
 void WebFileSystem::Write(duckdb::FileHandle &handle, void *buffer, int64_t nr_bytes, duckdb::idx_t location) {
+    init_console_log();
     auto &file_hdl = static_cast<WebFileHandle &>(handle);
     auto file_size = file_hdl.file_->file_size_;
     auto writer = static_cast<char *>(buffer);
     file_hdl.position_ = location;
-    while (nr_bytes > 0 && location < file_size) {
+    console_log("WebFSWrite('%s', %lld bytes at %llu, currFileSize: %llu)",
+                //
+                handle.GetPath().c_str(), nr_bytes, location, file_size.value_or(0));
+    while (nr_bytes > 0 /* && location < file_size*/) {
         auto n = Write(handle, writer, nr_bytes);
         writer += n;
         nr_bytes -= n;
@@ -800,6 +815,8 @@ int64_t WebFileSystem::Write(duckdb::FileHandle &handle, void *buffer, int64_t n
     std::unique_lock<SharedMutex> file_guard{file.file_mutex_};
     // Do the actual write
     size_t bytes_read = 0;
+    init_console_log();
+    console_log("WebFSWrite('%s'(%u), %lld bytes)", handle.GetPath().c_str(), file.data_protocol_, nr_bytes);
     switch (file.data_protocol_) {
         // Buffers are trans
         case DataProtocol::BUFFER: {
