@@ -1,6 +1,6 @@
 # RAPIDLY BUILDING DUCKDB-WASM
 
-Updated at: 2023-11-03
+Updated at: 2023-11-07
 
 The building manual in this section is only for Ubuntu and Mac OS.
 Feel free to ask [me](https://github.com/hangxingliu) in the Slack if you encounter any
@@ -59,6 +59,13 @@ source /path/to/your/emsdk/emsdk_env.sh # REMEMBER to replace the path here
 # You can take a break after executing this command, because it can take a long time
 ```
 
+## Build and Run DuckDB Web Shell
+
+``` bash
+# please make sure you have run `yarn install` before
+yarn workspace @duckdb/duckdb-wasm-shell build:debug && yarn workspace @duckdb/duckdb-wasm-app start
+```
+
 ## More Tips
 
 You can mount a RAMDISK at `/path/to/your/duckdb-wasm/build` to improve the building process.
@@ -109,7 +116,7 @@ cd ..
 # install rust
 curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh
 ```
-​
+
 **Restart ssh-shell**. Do not skip this step.
 ​
 ## Clone and init duckdb-wasm repository
@@ -119,7 +126,7 @@ cd duckdb-wasm
 git submodule update --init
 cd ~
 ```
-​
+
 Currently we have two branches:
 - master: building all packages in duckdb-wasm (mvp, eh, coi)
 - test_build_mvp (testing only): building one package mvp (ignore eh and coi) -- reduces build time by an hour! This will be the default when you build.
@@ -152,13 +159,13 @@ mkdir build
 make build/bootstrap
 DUCKDB_EXCEL=1 DUCKDB_JSON=1 DUCKDB_DATADOCS=1 make wasm 
 ```
-​
+
 - Building and running duckdb-shell
 ```sh
 DUCKDB_EXCEL=1 DUCKDB_JSON=1 DUCKDB_DATADOCS=1 make
 DUCKDB_EXCEL=1 DUCKDB_JSON=1 DUCKDB_DATADOCS=1 make app_start
 ```
-​
+
 ## Running Duckdb-shell in browser
 - Find the external IP address for the instance. Copy the IP to your clipboard.
 - Open browser and visit url: `http://<EXTERNAL_IP_ADDRESS>:9002/` (EG: http://35.247.34.76:9002/)
