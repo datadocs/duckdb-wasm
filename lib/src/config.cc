@@ -61,7 +61,9 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
                                   },
                               .allow_unsigned_extensions = false,
                               .arrow_lossless_conversion = false,
-                              .custom_user_agent = ""};
+                              .custom_user_agent = "",
+                              .force_checkpoint = false,
+                              .checkpoint_wal_size = 1 << 24};
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(args_json.data(), args_json.size());
     if (ok) {
@@ -112,6 +114,14 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
         }
         if (doc.HasMember("customUserAgent") && doc["customUserAgent"].IsString()) {
             config.custom_user_agent = doc["customUserAgent"].GetString();
+        }
+        if (doc.HasMember("checkpointWALSize") && doc["checkpointWALSize"].IsNumber()) {
+            auto checkpoint_wal_size = doc["checkpointWALSize"].GetUint64();
+            config.checkpoint_wal_size = checkpoint_wal_size;
+        }
+        if (doc.HasMember("forceCheckpoint") && doc["forceCheckpoint"].IsBool()) {
+            auto force_checkpoint = doc["forceCheckpoint"].GetUint64();
+            config.force_checkpoint = force_checkpoint;
         }
     }
     if (!config.query.cast_bigint_to_double.has_value()) {

@@ -965,6 +965,9 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         db_config.options.duckdb_api = "wasm";
         db_config.options.custom_user_agent = config_->custom_user_agent;
         db_config.options.use_direct_io = config_->use_direct_io;
+        db_config.options.force_checkpoint = config_->force_checkpoint;
+        if (config_->checkpoint_wal_size.has_value())
+            db_config.options.checkpoint_wal_size = config_->checkpoint_wal_size.value();
         auto db = make_shared_ptr<duckdb::DuckDB>(config_->path, &db_config);
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());

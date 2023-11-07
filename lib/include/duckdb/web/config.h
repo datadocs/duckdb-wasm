@@ -110,6 +110,11 @@ struct WebDBConfig {
     bool arrow_lossless_conversion = false;
 
     std::string custom_user_agent = "";
+    
+    /// Force checkpoint when CHECKPOINT is called or on shutdown, even if no changes have been made
+    bool force_checkpoint = false;
+    /// Checkpoint when WAL reaches this size (default: 16MB)
+    std::optional<uint64_t> checkpoint_wal_size = std::nullopt;
 
     /// Read from a document
     static WebDBConfig ReadFrom(std::string_view args_json);
