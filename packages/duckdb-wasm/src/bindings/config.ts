@@ -70,4 +70,12 @@ export interface DuckDBConfig {
      * Custom user agent string
      */
     customUserAgent?: string;
+    /*
+     * Checkpoint when WAL reaches this size (default: 16MB)
+     */
+    checkpointWALSize?: number;
+    /**
+     * Force checkpoint when CHECKPOINT is called or on shutdown, even if no changes have been made
+     */
+    forceCheckpoint?: boolean;
 }
