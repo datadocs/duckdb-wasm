@@ -43,7 +43,7 @@ parse_args() {
 		arg="$1"; shift;
 		case "$arg" in
 			-h|--help|help) usage;;
-      --release) build_type='relsize';;     # relperf
+      --release) build_type='relperf';;     # relperf
 			--skip-js) skip_js_bundle=1;;
 			-dd|--dd|--duckdb) rebuild_duckdb=1;;
       -*) throw  "Unknown option '$arg'";;
