@@ -678,9 +678,14 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                     // const data = new Uint8Array(bytes);
                     // const num = handle.read(data, { at: location });
                     // mod.HEAPU8.set(data, buf);
-                    // return num;
                     const out = mod.HEAPU8.subarray(buf, buf + bytes);
-                    return handle.read(out, { at: location });
+                    const num = handle.read(out, { at: location });
+                    if (logWASMCall) {
+                        const error = bytes !== num ? `ERR!! ${bytes} != ${num}` : `${num}`;
+                        const header = out.at(0)!.toString(16) + ',' + out.at(1)!.toString(16);
+                        console.log(`[WASM-CALL] readFile("${file.fileName}", ${location}, ${header}) ${error}`);
+                    }
+                    return num;
                 }
             }
             return 0;
