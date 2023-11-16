@@ -805,7 +805,7 @@ void WebFileSystem::Write(duckdb::FileHandle &handle, void *buffer, int64_t nr_b
     auto file_size = file_hdl.file_->file_size_;
     auto writer = static_cast<char *>(buffer);
     file_hdl.position_ = location;
-    while (nr_bytes > 0) {
+    while (nr_bytes > 0 /*&& location < file_size*/) {
         auto n = Write(handle, writer, nr_bytes);
         writer += n;
         nr_bytes -= n;
