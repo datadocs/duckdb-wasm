@@ -84,6 +84,7 @@ done
 if [ -z "$skip_js_bundle" ]; then
 pushd -- packages/duckdb-wasm >/dev/null || exit 1;
 execute pwd;
+export KEEP_DEBUG_LOGS=1;
 execute yarn run build:release; 
 popd >/dev/null || exit 1;
 fi
