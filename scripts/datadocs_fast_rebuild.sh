@@ -74,7 +74,7 @@ execute touch .ccache/extension/datadocs;
 # export ENABLE_DATADOCS_EXTENSION=OFF;
 for build_feature in "${build_features[@]}"; do
   [ -n "$rebuild_duckdb" ] && 
-  removedir "build/dev/${build_feature}/third_party/duckdb/src/duckdb_ep-stamp";
+  removedir "build/${build_type}/${build_feature}/third_party/duckdb/src/duckdb_ep-stamp";
 
   # execute make wasm_dev -j4;
   execute ./scripts/wasm_build_lib.sh "$build_type" "$build_feature";
