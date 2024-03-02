@@ -66,6 +66,9 @@ ExternalProject_Add(
     <INSTALL_DIR>/lib/libparquet_extension.a
     # <INSTALL_DIR>/lib/libfts_extension.a
     <INSTALL_DIR>/lib/libcore_functions_extension.a
+    <INSTALL_DIR>/lib/libexpat.a
+    <INSTALL_DIR>/lib/libicu.a
+    <INSTALL_DIR>/lib/libzlib.a
     <INSTALL_DIR>/lib/libexcel_extension.a
     <INSTALL_DIR>/lib/libjson_extension.a
     <INSTALL_DIR>/lib/libdatadocs_extension.a)
@@ -130,6 +133,7 @@ target_include_directories(duckdb_core_functions INTERFACE ${DUCKDB_SOURCE_DIR}/
 
 if(ENABLE_DATADOCS_EXTENSION)
   add_library(duckdb_datadocs STATIC IMPORTED)
+  # target_link_libraries(duckdb_datadocs INTERFACE zlib INTERFACE expat INTERFACE icu)
   set_property(TARGET duckdb_datadocs PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libdatadocs_extension.a)
   target_include_directories(duckdb_datadocs INTERFACE ${DUCKDB_SOURCE_DIR}/extension/datadocs/include)
   add_dependencies(duckdb_datadocs duckdb_ep)

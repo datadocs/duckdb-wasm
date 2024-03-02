@@ -42,7 +42,7 @@ RSYNC_FILES=(
 )
 RSYNC_OPTIONS=(
 	-a
-	--xattrs
+	# --xattrs
 	--progress
 	--iconv=utf-8
 	# --delete
@@ -59,11 +59,11 @@ RSYNC_OPTIONS=(
 	--exclude='packages/duckdb-wasm/src/bindings/duckdb*.js'
 	--exclude='packages/duckdb-wasm/src/bindings/duckdb*.wasm'
 	--exclude='packages/benchmarks'
-	--exclude='packages/duckdb-wasm-*'
-	--exclude='packages/react-duckdb'
+	# --exclude='packages/duckdb-wasm-*'
+	# --exclude='packages/react-duckdb'
 
 	# for remote rsync installed by brew
-	--rsync-path=/usr/local/opt/rsync/bin/rsync
+	# --rsync-path=/usr/local/opt/rsync/bin/rsync
 );
 # the end of init()
 }
