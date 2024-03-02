@@ -338,6 +338,10 @@ else()
   target_link_libraries(duckdb_web_json duckdb duckdb_json)
   if(ENABLE_DATADOCS_EXTENSION)
     target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
+    # Linking used libraries from the build output directory to fix runtime errors like "Aborted(missing function: unzOpen2)"
+    # Example Path: build/dev/eh/third_party/duckdb/install/lib
+    link_directories(${CMAKE_CURRENT_BINARY_DIR}/third_party/duckdb/install/lib)
+    target_link_libraries(duckdb_web_datadocs zlib expat icu)
   endif()
 endif()
 
@@ -355,6 +359,7 @@ if(EMSCRIPTEN)
   add_executable(duckdb_wasm ${CMAKE_SOURCE_DIR}/src/wasm_main.cc)
   target_link_libraries(duckdb_wasm duckdb_web ${THREAD_LIBS})
   message(STATUS "WASM_LINK_FLAGS=${WASM_LINK_FLAGS}")
+  message(STATUS "LINK_FLAGS=${LINK_FLAGS}")
   set_target_properties(
     duckdb_wasm
     PROPERTIES

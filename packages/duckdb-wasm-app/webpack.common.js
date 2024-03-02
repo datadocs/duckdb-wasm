@@ -2,6 +2,7 @@ import HtmlWebpackPlugin from 'html-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
 import path from 'path';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -154,11 +155,13 @@ export function configure(params) {
                         from: './static/css',
                         to: './static/css',
                     },
-                    {
-                        from: '../duckdb-wasm/docs',
-                        to: './docs',
-                    },
-                ],
+                    existsSync(path.join(__dirname, '../duckdb-wasm/docs'))
+                        ? {
+                              from: '../duckdb-wasm/docs',
+                              to: './docs',
+                          }
+                        : undefined,
+                ].filter(Boolean),
             }),
         ],
         experiments: {
