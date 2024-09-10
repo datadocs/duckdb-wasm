@@ -61,7 +61,8 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
                                   },
                               .force_checkpoint = false,
                               .checkpoint_wal_size = 1 << 24,
-                              .allow_unsigned_extensions = false};
+                              .allow_unsigned_extensions = false,
+                              .custom_user_agent = ""};
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(args_json.begin(), args_json.size());
     if (ok) {
@@ -111,6 +112,9 @@ WebDBConfig WebDBConfig::ReadFrom(std::string_view args_json) {
         if (doc.HasMember("forceCheckpoint") && doc["forceCheckpoint"].IsBool()) {
             auto force_checkpoint = doc["forceCheckpoint"].GetUint64();
             config.force_checkpoint = force_checkpoint;
+        }
+        if (doc.HasMember("customUserAgent") && doc["customUserAgent"].IsString()) {
+            config.custom_user_agent = doc["customUserAgent"].GetString();
         }
     }
     if (!config.query.cast_bigint_to_double.has_value()) {

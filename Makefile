@@ -361,7 +361,6 @@ app: wasm wasmpack shell docs js_tests_release
 	yarn workspace @duckdb/duckdb-wasm-app build:release
 
 build_loadable:
-	cp .github/config/extension_config_wasm.cmake submodules/duckdb/extension/extension_config.cmake
 	DUCKDB_PLATFORM=wasm_${TARGET} DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize ${TARGET}
 
 build_loadable_unsigned: build_loadable
@@ -373,11 +372,11 @@ serve_loadable_base: wasmpack shell docs
 
 .PHONY: serve_local
 serve_local: build_loadable_unsigned serve_loadable_base
-	http-server packages/duckdb-wasm-app/build/release -o "#queries=v0,SET-custom_extension_repository%3D'http%3A%2F%2F127.0.0.1%3A8080%2Fextension_repository'~" -a 127.0.0.1 -p 8080
+	npx http-server packages/duckdb-wasm-app/build/release -o "#queries=v0,SET-custom_extension_repository%3D'http%3A%2F%2F127.0.0.1%3A8080%2Fextension_repository'~" -a 127.0.0.1 -p 8080
 
 .PHONY: serve
 serve: build_loadable serve_loadable_base
-	http-server packages/duckdb-wasm-app/build/release -o
+	npx http-server packages/duckdb-wasm-app/build/release -o
 
 .PHONY: app_server
 app_server:
@@ -432,10 +431,17 @@ clean:
 	cd packages/duckdb-wasm-shell && rm -rf node_modules
 	rm -rf packages/duckdb-wasm-app/build
 	rm -rf submodules/duckdb/build
+	rm -rf packages/duckdb-wasm/dist
 
 build/docker_ci_image:
 	command -v emcc &> /dev/null || docker compose build
 	touch build/docker_ci_image
+
+patch_duckdb:
+	(find patches/duckdb/* -type f -name '*.patch' -print0 | xargs -0 cat | patch -p1 --forward -d submodules/duckdb) || true
+	(find patches/arrow/* -type f -name '*.patch' -print0 | xargs -0 cat | patch -p1 --forward -d submodules/arrow) || true
+
+apply_patches: patch_duckdb
 
 submodules:
 	git submodule update --init --recursive

@@ -330,7 +330,8 @@ arrow::Result<duckdb::unique_ptr<duckdb::QueryResult>> WebDB::Connection::Execut
             if (v.IsLosslessDouble())
                 values.emplace_back(v.GetDouble());
             else if (v.IsString())
-                values.emplace_back(v.GetString());
+                // Use GetStringLenght otherwise null bytes will be counted as terminators
+                values.emplace_back(string_t(v.GetString(), v.GetStringLength()));
             else if (v.IsNull())
                 values.emplace_back(nullptr);
             else if (v.IsBool())
@@ -839,6 +840,7 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         if (config_->checkpoint_wal_size.has_value())
             db_config.options.checkpoint_wal_size = config_->checkpoint_wal_size.value();
         db_config.options.duckdb_api = "wasm";
+        db_config.options.custom_user_agent = config_->custom_user_agent;
         auto db = make_shared_ptr<duckdb::DuckDB>(config_->path, &db_config);
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
