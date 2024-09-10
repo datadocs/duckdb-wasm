@@ -138,26 +138,21 @@ RT_FN(ssize_t duckdb_web_fs_file_write(size_t file_id, void *buffer, ssize_t byt
     file.Write(buffer, bytes, location);
     return bytes;
 });
-RT_FN(void duckdb_web_fs_directory_remove(const char *path, size_t pathLen), {
-    NATIVE_FS->RemoveDirectory(std::string{path, pathLen});
-});
-RT_FN(bool duckdb_web_fs_directory_exists(const char *path, size_t pathLen), {
-    return NATIVE_FS->DirectoryExists(std::string{path, pathLen});
-});
-RT_FN(void duckdb_web_fs_directory_create(const char *path, size_t pathLen), {
-    NATIVE_FS->CreateDirectory(std::string{path, pathLen});
-});
+RT_FN(void duckdb_web_fs_directory_remove(const char *path, size_t pathLen),
+      { NATIVE_FS->RemoveDirectory(std::string{path, pathLen}); });
+RT_FN(bool duckdb_web_fs_directory_exists(const char *path, size_t pathLen),
+      { return NATIVE_FS->DirectoryExists(std::string{path, pathLen}); });
+RT_FN(void duckdb_web_fs_directory_create(const char *path, size_t pathLen),
+      { NATIVE_FS->CreateDirectory(std::string{path, pathLen}); });
 RT_FN(bool duckdb_web_fs_directory_list_files(const char *path, size_t pathLen), { return false; });
 RT_FN(void duckdb_web_fs_glob(const char *path, size_t pathLen), {
     auto &state = GetLocalState();
     state.glob_results = NATIVE_FS->Glob(std::string{path, pathLen});
 });
-RT_FN(void duckdb_web_fs_file_move(const char *from, size_t fromLen, const char *to, size_t toLen), {
-    NATIVE_FS->MoveFile(std::string{from, fromLen}, std::string{to, toLen});
-});
-RT_FN(bool duckdb_web_fs_file_exists(const char *path, size_t pathLen, const char *url, size_t urlLen), {
-    return NATIVE_FS->FileExists(std::string{path, pathLen});
-});
+RT_FN(void duckdb_web_fs_file_move(const char *from, size_t fromLen, const char *to, size_t toLen),
+      { NATIVE_FS->MoveFile(std::string{from, fromLen}, std::string{to, toLen}); });
+RT_FN(bool duckdb_web_fs_file_exists(const char *path, size_t pathLen, const char *url, size_t urlLen),
+      { return NATIVE_FS->FileExists(std::string{path, pathLen}); });
 #undef RT_FN
 
 extern "C" void duckdb_web_fs_glob_add_path(const char *path) {
