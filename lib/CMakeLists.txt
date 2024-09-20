@@ -276,49 +276,57 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/webdb.cc
   ${CMAKE_SOURCE_DIR}/src/webdb_api.cc)
 
-add_library(
-  duckdb_web_fts
-  ${CMAKE_SOURCE_DIR}/src/extensions/fts_extension.cc)
+if (DUCKDB_WASM_LOADABLE_EXTENSIONS)
+  set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
+  set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
+  if(ENABLE_DATADOCS_EXTENSION)
+    set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
+  endif()
+  set(DUCKDB_WEB_JSON "")
 
-add_library(
-  duckdb_web_parquet
-  ${CMAKE_SOURCE_DIR}/src/extensions/parquet_extension.cc)
+  target_link_libraries(duckdb_web duckdb arrow rapidjson ${THREAD_LIBS})
+else()
+  add_library(
+    duckdb_web_fts
+    ${CMAKE_SOURCE_DIR}/src/extensions/fts_extension.cc)
 
-add_library(
-  duckdb_web_json
-  ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
+  add_library(
+    duckdb_web_parquet
+    ${CMAKE_SOURCE_DIR}/src/extensions/parquet_extension.cc)
 
-if(ENABLE_DATADOCS_EXTENSION)
-add_library(
-  duckdb_web_datadocs
-  ${CMAKE_SOURCE_DIR}/src/extensions/datadocs_extension.cc)
-endif()
+  add_library(
+    duckdb_web_json
+    ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
 
-set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
-set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
-if(ENABLE_DATADOCS_EXTENSION)
-set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
-endif()
-set(DUCKDB_WEB_JSON "")
-if(EXISTS "${JSON_EXTENSION_CACHE_FILE}")
-  set(DUCKDB_WEB_JSON "duckdb_web_json")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_JSON_EXTENSION")
-endif()
-if(ENABLE_DATADOCS_EXTENSION)
-  set(DUCKDB_WEB_DATADOCS "duckdb_web_datadocs")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_DATADOCS_EXTENSION")
-endif()
+  if(ENABLE_DATADOCS_EXTENSION)
+    add_library(
+      duckdb_web_datadocs
+      ${CMAKE_SOURCE_DIR}/src/extensions/datadocs_extension.cc)
+  endif()
 
-target_link_libraries(duckdb_web duckdb duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} arrow rapidjson ${THREAD_LIBS})
-target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
-target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
-target_link_libraries(duckdb_web_json duckdb duckdb_json)
-if(ENABLE_DATADOCS_EXTENSION)
-  target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
-  # Linking used libraries from the build output directory to fix runtime errors like "Aborted(missing function: unzOpen2)"
-  # Example Path: build/dev/eh/third_party/duckdb/install/lib
-  link_directories(${CMAKE_CURRENT_BINARY_DIR}/third_party/duckdb/install/lib)
-  target_link_libraries(duckdb_web_datadocs zlib expat icu)
+  set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
+  set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
+  if(ENABLE_DATADOCS_EXTENSION)
+    set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
+  endif()
+  
+  set(DUCKDB_WEB_JSON "")
+  if(EXISTS "${JSON_EXTENSION_CACHE_FILE}")
+    set(DUCKDB_WEB_JSON "duckdb_web_json")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_JSON_EXTENSION")
+  endif()
+
+  target_link_libraries(duckdb_web duckdb duckdb_web_fts duckdb_web_parquet ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} arrow rapidjson ${THREAD_LIBS})
+  target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
+  target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
+  target_link_libraries(duckdb_web_json duckdb duckdb_json)
+  if(ENABLE_DATADOCS_EXTENSION)
+    target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
+    # Linking used libraries from the build output directory to fix runtime errors like "Aborted(missing function: unzOpen2)"
+    # Example Path: build/dev/eh/third_party/duckdb/install/lib
+    link_directories(${CMAKE_CURRENT_BINARY_DIR}/third_party/duckdb/install/lib)
+    target_link_libraries(duckdb_web_datadocs zlib expat icu)
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------
