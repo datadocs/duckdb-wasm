@@ -76,7 +76,7 @@ for build_feature in "${build_features[@]}"; do
   removedir "build/${build_type}/${build_feature}/third_party/duckdb/src/duckdb_ep-stamp";
 
   # execute make wasm_dev -j4;
-  execute ./scripts/wasm_build_lib.sh "$build_type" "$build_feature";
+  execute bash ./scripts/wasm_build_lib.sh "$build_type" "$build_feature";
   target_wasm_files+=( "packages/duckdb-wasm/src/bindings/duckdb-$build_feature.wasm" );
 done
 
