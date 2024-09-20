@@ -193,36 +193,37 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     let contentLength = null;
                     let error: any | null = null;
                     if (file.reliableHeadRequests || !file.allowFullHttpReads) {
-                        try {
-                            // Send a dummy HEAD request with range protocol
-                            //          -> good IFF status is 206 and contentLenght is present
-                            const xhr = new XMLHttpRequest();
-                            if (file.dataProtocol == DuckDBDataProtocol.S3) {
-                                xhr.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
-                                addS3Headers(xhr, file.s3Config, file.dataUrl!, 'HEAD');
-                            } else {
-                                xhr.open('HEAD', file.dataUrl!, false);
-                            }
-                            xhr.setRequestHeader('Range', `bytes=0-`);
-                            xhr.send(null);
-
-                            // Supports range requests
-                            contentLength = xhr.getResponseHeader('Content-Length');
-                            if (contentLength !== null && xhr.status == 206) {
-                                const result = mod._malloc(2 * 8);
-                                mod.HEAPF64[(result >> 3) + 0] = +contentLength;
-                                mod.HEAPF64[(result >> 3) + 1] = 0;
-                                return result;
-                            }
-                        } catch (e: any) {
-                            error = e;
-                            console.warn(`HEAD request with range header failed: ${e}`);
+                    try {
+                        // Send a dummy HEAD request with range protocol
+                        //          -> good IFF status is 206 and contentLenght is present
+                        const xhr = new XMLHttpRequest();
+                        if (file.dataProtocol == DuckDBDataProtocol.S3) {
+                            xhr.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
+                            addS3Headers(xhr, file.s3Config, file.dataUrl!, 'HEAD');
+                        } else {
+                            xhr.open('HEAD', file.dataUrl!, false);
                         }
+                        xhr.setRequestHeader('Range', `bytes=0-`);
+                        xhr.send(null);
+
+                        // Supports range requests
+                        contentLength = xhr.getResponseHeader('Content-Length');
+                        if (contentLength !== null && xhr.status == 206) {
+                            const result = mod._malloc(2 * 8);
+                            mod.HEAPF64[(result >> 3) + 0] = +contentLength;
+                            mod.HEAPF64[(result >> 3) + 1] = 0;
+                            return result;
+                        }
+
+                    } catch (e: any) {
+                        error = e;
+                        console.warn(`HEAD request with range header failed: ${e}`);
+                    }
                     }
 
                     // Try to fallback to full read?
                     if (file.allowFullHttpReads) {
-                        if (contentLength !== null && +contentLength > 1) {
+                        {
                             // 2. Send a dummy GET range request querying the first byte of the file
                             //          -> good IFF status is 206 and contentLenght2 is 1
                             //          -> otherwise, iff 200 and contentLenght2 == contentLenght
@@ -263,23 +264,13 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                                 }
                             }
 
-                            if (
-                                xhr.status == 206 &&
-                                contentLength2 !== null &&
-                                +contentLength2 == 1 &&
-                                presumedLength !== null
-                            ) {
+                            if (xhr.status == 206 && contentLength2 !== null && +contentLength2 == 1 && presumedLength !== null) {
                                 const result = mod._malloc(2 * 8);
                                 mod.HEAPF64[(result >> 3) + 0] = +presumedLength;
                                 mod.HEAPF64[(result >> 3) + 1] = 0;
                                 return result;
                             }
-                            if (
-                                xhr.status == 200 &&
-                                contentLength2 !== null &&
-                                contentLength !== null &&
-                                +contentLength2 == +contentLength
-                            ) {
+                            if (xhr.status == 200 && contentLength2 !== null && contentLength !== null && +contentLength2 == +contentLength) {
                                 console.warn(`fall back to full HTTP read for: ${file.dataUrl}`);
                                 const data = mod._malloc(xhr.response.byteLength);
                                 const src = new Uint8Array(xhr.response, 0, xhr.response.byteLength);
@@ -416,29 +407,29 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
             return 0;
         }
     },
-    checkFile: (mod: DuckDBModule, pathPtr: number, pathLen: number, urlPtr?: number, urlLen?: number): boolean => {
+    checkFile: (mod: DuckDBModule, pathPtr: number, pathLen: number): boolean => {
         try {
             const path = readString(mod, pathPtr, pathLen);
             const handle = BROWSER_RUNTIME._files?.get(path);
 
-            const url = urlPtr && urlLen && urlLen > 0 ? readString(mod, urlPtr, urlLen) : '';
-            if (logWASMCall) console.log(`[WASM-CALL] checkFile("${path}", "${url}")`);
-            if (handle && url.startsWith('opfs://')) {
+            if (logWASMCall) console.log(`[WASM-CALL] checkFile("${path}")`);
+            if (handle && path.startsWith('opfs://')) {
                 const opfsHandle: OPFSFileHandle = handle;
                 const isEmpty = opfsHandle.file?.size === 0;
                 if (isEmpty && opfsHandle.emptyAsAbsent) return false;
                 return true;
             }
+            // Starts with http or S3?
             // Try a HTTP HEAD request
-            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('s3://')) {
+            if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('s3://')) {
                 // Send a dummy range request querying the first byte of the file
                 const xhr = new XMLHttpRequest();
-                if (url.startsWith('s3://')) {
+                if (path.startsWith('s3://')) {
                     const globalInfo = BROWSER_RUNTIME.getGlobalFileInfo(mod);
-                    xhr.open('HEAD', getHTTPUrl(globalInfo?.s3Config, url), false);
-                    addS3Headers(xhr, globalInfo?.s3Config, url, 'HEAD');
+                    xhr.open('HEAD', getHTTPUrl(globalInfo?.s3Config, path), false);
+                    addS3Headers(xhr, globalInfo?.s3Config, path, 'HEAD');
                 } else {
-                    xhr.open('HEAD', url!, false);
+                    xhr.open('HEAD', path!, false);
                 }
                 xhr.send(null);
                 return xhr.status == 206 || xhr.status == 200;
