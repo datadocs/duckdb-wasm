@@ -15,7 +15,7 @@ import { UDFFunction, UDFFunctionDeclaration } from './udf_function';
 import * as arrow from 'apache-arrow';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logWASMCall = !!process.env.KEEP_DEBUG_LOGS;
+const logWASMCall = typeof process !== 'undefined' && !!process.env.KEEP_DEBUG_LOGS;
 
 const TEXT_ENCODER = new TextEncoder();
 
@@ -271,7 +271,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
     /** Get Ingest Schema for a file */
     public ingestGetSchema(conn: number, fileName: string, path: string): string {
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_ingest_get_schema', ['number', 'string', 'string'], [conn, fileName, path]);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_ingest_get_schema',
+            ['number', 'string', 'string'],
+            [conn, fileName, path],
+        );
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
