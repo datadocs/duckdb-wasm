@@ -18,7 +18,7 @@ import { assertOPFSHandle, OPFSFileHandle } from './opfs';
 import { DuckDBModule } from './duckdb_module';
 import * as udf from './udf_runtime';
 
-const logWASMCall = !!process.env.KEEP_DEBUG_LOGS;
+const logWASMCall = typeof process !== 'undefined' && !!process.env.KEEP_DEBUG_LOGS;
 
 export type DuckDBBrowserRuntime = DuckDBRuntime & {
     _fileInfoCache: Map<number, DuckDBFileInfo>;

@@ -16,7 +16,7 @@ import { WebFile } from './web_file';
 import { UDFFunction, UDFFunctionDeclaration } from './udf_function';
 import * as arrow from 'apache-arrow';
 
-const logWASMCall = !!process.env.KEEP_DEBUG_LOGS;
+const logWASMCall = typeof process !== 'undefined' && !!process.env.KEEP_DEBUG_LOGS;
 
 const TEXT_ENCODER = new TextEncoder();
 
