@@ -413,7 +413,7 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
             const handle = BROWSER_RUNTIME._files?.get(path);
 
             if (logWASMCall) console.log(`[WASM-CALL] checkFile("${path}")`);
-            if (handle && path.startsWith('opfs://')) {
+            if (handle) {
                 const opfsHandle: OPFSFileHandle = handle;
                 const isEmpty = opfsHandle.file?.size === 0;
                 if (isEmpty && opfsHandle.emptyAsAbsent) return false;
