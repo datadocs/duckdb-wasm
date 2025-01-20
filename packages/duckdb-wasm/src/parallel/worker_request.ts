@@ -148,6 +148,8 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.RUN_QUERY, [number, string]>
     | WorkerRequest<WorkerRequestType.SEND_PREPARED, [number, number, any[]]>
     | WorkerRequest<WorkerRequestType.START_PENDING_QUERY, [number, string, boolean]>
+    | WorkerRequest<WorkerRequestType.CLOSE_FILE, string>
+    | WorkerRequest<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string]>
     | WorkerRequest<WorkerRequestType.TOKENIZE, string>;
 
 export type WorkerResponseVariant =

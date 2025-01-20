@@ -7,7 +7,7 @@ import fs from 'fs';
 
 declare global {
     // eslint-disable-next-line no-var
-    var DUCKDB_RUNTIME: DuckDBRuntime;
+    var DUCKDB_RUNTIME: any;
 }
 
 /** DuckDB bindings for node.js */
