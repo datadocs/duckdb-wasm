@@ -37,8 +37,9 @@ export class DuckDBConnection {
     /** Send a query */
     public async send<T extends { [key: string]: arrow.DataType } = any>(
         text: string,
+        allowStreamResult: boolean = false,
     ): Promise<arrow.RecordBatchStreamReader<T>> {
-        let header = this._bindings.startPendingQuery(this._conn, text);
+        let header = this._bindings.startPendingQuery(this._conn, text, allowStreamResult);
         while (header == null) {
             header = await new Promise((resolve, reject) => {
                 try {

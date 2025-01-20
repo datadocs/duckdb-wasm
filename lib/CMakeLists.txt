@@ -358,6 +358,7 @@ if(EMSCRIPTEN)
       -s EXPORTED_FUNCTIONS='[ \
           _main, \
           _malloc, \
+          _calloc, \
           _free, \
           _duckdb_web_clear_response, \
           _duckdb_web_collect_file_stats, \
@@ -381,6 +382,7 @@ if(EMSCRIPTEN)
           _duckdb_web_get_global_file_info, \
           _duckdb_web_get_tablenames, \
           _duckdb_web_ingest_get_schema, \
+          _duckdb_web_get_tablenames_buffer, \
           _duckdb_web_get_version, \
           _duckdb_web_insert_arrow_from_ipc_stream, \
           _duckdb_web_insert_csv_from_path, \
@@ -389,8 +391,10 @@ if(EMSCRIPTEN)
           _duckdb_web_pending_query_cancel, \
           _duckdb_web_pending_query_poll, \
           _duckdb_web_pending_query_start, \
+          _duckdb_web_pending_query_start_buffer, \
           _duckdb_web_prepared_close, \
           _duckdb_web_prepared_create, \
+          _duckdb_web_prepared_create_buffer, \
           _duckdb_web_prepared_run, \
           _duckdb_web_prepared_send, \
           _duckdb_web_query_fetch_results, \
@@ -398,6 +402,7 @@ if(EMSCRIPTEN)
           _duckdb_web_query_run_buffer, \
           _duckdb_web_reset, \
           _duckdb_web_tokenize, \
+          _duckdb_web_tokenize_buffer, \
           _duckdb_web_udf_scalar_create \
       ]' \
       -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\"]' \

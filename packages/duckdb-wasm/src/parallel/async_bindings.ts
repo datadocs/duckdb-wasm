@@ -160,6 +160,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         switch (task.type) {
             case WorkerRequestType.CLOSE_PREPARED:
             case WorkerRequestType.COLLECT_FILE_STATISTICS:
+            case WorkerRequestType.REGISTER_OPFS_FILE_NAME:
             case WorkerRequestType.COPY_FILE_TO_PATH:
             case WorkerRequestType.DISCONNECT:
             case WorkerRequestType.DROP_FILE:
@@ -412,11 +413,16 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     }
 
     /** Start a pending query */
-    public async startPendingQuery(conn: ConnectionID, text: string): Promise<Uint8Array | null> {
-        const task = new WorkerTask<WorkerRequestType.START_PENDING_QUERY, [ConnectionID, string], Uint8Array | null>(
+    public async startPendingQuery(
+        conn: ConnectionID,
+        text: string,
+        allowStreamResult: boolean = false,
+    ): Promise<Uint8Array | null> {
+        const task = new WorkerTask<
             WorkerRequestType.START_PENDING_QUERY,
-            [conn, text],
-        );
+            [ConnectionID, string, boolean],
+            Uint8Array | null
+        >(WorkerRequestType.START_PENDING_QUERY, [conn, text, allowStreamResult]);
         return await this.postTask(task);
     }
     /** Poll a pending query */
@@ -558,6 +564,15 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             [string, any, DuckDBDataProtocol, boolean],
             null
         >(WorkerRequestType.REGISTER_FILE_HANDLE, [name, handle, protocol, directIO]);
+        await this.postTask(task, []);
+    }
+
+    /** Enable file statistics */
+    public async registerOPFSFileName(name: string): Promise<void> {
+        const task = new WorkerTask<WorkerRequestType.REGISTER_OPFS_FILE_NAME, [string], null>(
+            WorkerRequestType.REGISTER_OPFS_FILE_NAME,
+            [name],
+        );
         await this.postTask(task, []);
     }
 

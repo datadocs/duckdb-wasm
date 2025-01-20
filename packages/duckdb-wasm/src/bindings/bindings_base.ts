@@ -22,7 +22,7 @@ const TEXT_ENCODER = new TextEncoder();
 
 declare global {
     // eslint-disable-next-line no-var
-    var DUCKDB_RUNTIME: DuckDBRuntime;
+    var DUCKDB_RUNTIME: any;
 }
 
 /** A DuckDB Feature */
@@ -138,7 +138,17 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Tokenize a script */
     public tokenize(text: string): ScriptTokens {
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_tokenize', ['string'], [text]);
+        const BUF = TEXT_ENCODER.encode(text);
+        const bufferPtr = this.mod._malloc(BUF.length);
+        const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
+        bufferOfs.set(BUF);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_tokenize_buffer',
+            ['number', 'number'],
+            [bufferPtr, BUF.length],
+        );
+        this.mod._free(bufferPtr);
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
@@ -168,16 +178,21 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     /** Send a query and return the full result */
     public runQuery(conn: number, text: string): Uint8Array {
         const BUF = TEXT_ENCODER.encode(text);
-        const bufferPtr = this.mod._malloc(BUF.length );
-        const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length );
+        const bufferPtr = this.mod._malloc(BUF.length);
+        const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
         bufferOfs.set(BUF);
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_query_run_buffer', ['number', 'number', 'number'], [conn, bufferPtr, BUF.length]);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_query_run_buffer',
+            ['number', 'number', 'number'],
+            [conn, bufferPtr, BUF.length],
+        );
+        this.mod._free(bufferPtr);
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
         const res = copyBuffer(this.mod, d, n);
         dropResponseBuffers(this.mod);
-        this.mod._free(bufferPtr);
         return res;
     }
     /**
@@ -186,8 +201,18 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
      *  On null, the query has to be executed using `pollPendingQuery` until that returns != null.
      *  Results can then be fetched using `fetchQueryResults`
      */
-    public startPendingQuery(conn: number, text: string): Uint8Array | null {
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_pending_query_start', ['number', 'string'], [conn, text]);
+    public startPendingQuery(conn: number, text: string, allowStreamResult: boolean = false): Uint8Array | null {
+        const BUF = TEXT_ENCODER.encode(text);
+        const bufferPtr = this.mod._malloc(BUF.length);
+        const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
+        bufferOfs.set(BUF);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_pending_query_start_buffer',
+            ['number', 'number', 'number', 'boolean'],
+            [conn, bufferPtr, BUF.length, allowStreamResult],
+        );
+        this.mod._free(bufferPtr);
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
@@ -227,7 +252,17 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
     /** Get table names */
     public getTableNames(conn: number, text: string): string[] {
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_get_tablenames', ['number', 'string'], [conn, text]);
+        const BUF = TEXT_ENCODER.encode(text);
+        const bufferPtr = this.mod._malloc(BUF.length);
+        const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
+        bufferOfs.set(BUF);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_get_tablenames_buffer',
+            ['number', 'number', 'number'],
+            [conn, bufferPtr, BUF.length],
+        );
+        this.mod._free(bufferPtr);
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
@@ -237,7 +272,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
     /** Get Ingest Schema for a file */
     public ingestGetSchema(conn: number, fileName: string, path: string): string {
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_ingest_get_schema', ['number', 'string', 'string'], [conn, fileName, path]);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_ingest_get_schema',
+            ['number', 'string', 'string'],
+            [conn, fileName, path],
+        );
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
@@ -292,7 +332,17 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Prepare a statement and return its identifier */
     public createPrepared(conn: number, text: string): number {
-        const [s, d, n] = callSRet(this.mod, 'duckdb_web_prepared_create', ['number', 'string'], [conn, text]);
+        const BUF = TEXT_ENCODER.encode(text);
+        const bufferPtr = this.mod._malloc(BUF.length);
+        const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
+        bufferOfs.set(BUF);
+        const [s, d, n] = callSRet(
+            this.mod,
+            'duckdb_web_prepared_create_buffer',
+            ['number', 'number', 'number'],
+            [conn, bufferPtr, BUF.length],
+        );
+        this.mod._free(bufferPtr);
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
         }
@@ -463,6 +513,74 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
         dropResponseBuffers(this.mod);
     }
+    public async prepareFileHandle(fileName: string, protocol: DuckDBDataProtocol): Promise<void> {
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS && this._runtime.prepareFileHandles) {
+            const list = await this._runtime.prepareFileHandles([fileName], DuckDBDataProtocol.BROWSER_FSACCESS);
+            for (const item of list) {
+                const { handle, path: filePath, fromCached } = item;
+                if (!fromCached && handle.getSize()) {
+                    await this.registerFileHandleAsync(filePath, handle, DuckDBDataProtocol.BROWSER_FSACCESS, true);
+                }
+            }
+            return;
+        }
+        throw new Error(`prepareFileHandle: unsupported protocol ${protocol}`);
+    }
+    /** Prepare a file handle that could only be acquired aschronously */
+    public async prepareDBFileHandle(path: string, protocol: DuckDBDataProtocol): Promise<void> {
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS && this._runtime.prepareDBFileHandle) {
+            const list = await this._runtime.prepareDBFileHandle(path, DuckDBDataProtocol.BROWSER_FSACCESS);
+            for (const item of list) {
+                const { handle, path: filePath, fromCached } = item;
+                if (!fromCached && handle.getSize()) {
+                    await this.registerFileHandleAsync(filePath, handle, DuckDBDataProtocol.BROWSER_FSACCESS, true);
+                }
+            }
+            return;
+        }
+        throw new Error(`prepareDBFileHandle: unsupported protocol ${protocol}`);
+    }
+    /** Prepare a file object URL */
+    public async prepareFileHandleAsync<HandleType>(
+        name: string,
+        handle: HandleType,
+        protocol: DuckDBDataProtocol,
+        directIO: boolean,
+    ): Promise<HandleType> {
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
+            if (handle instanceof FileSystemSyncAccessHandle) {
+                // already a handle is sync handle.
+            } else if (handle instanceof FileSystemFileHandle) {
+                // handle is an async handle, should convert to sync handle
+                const fileHandle: FileSystemFileHandle = handle as any;
+                try {
+                    handle = (await fileHandle.createSyncAccessHandle()) as any;
+                } catch (e: any) {
+                    throw new Error(e.message + ':' + name);
+                }
+            } else if (name != null) {
+                // should get sync handle from the file name.
+                try {
+                    const opfsRoot = await navigator.storage.getDirectory();
+                    const fileHandle = await opfsRoot.getFileHandle(name);
+                    handle = (await fileHandle.createSyncAccessHandle()) as any;
+                } catch (e: any) {
+                    throw new Error(e.message + ':' + name);
+                }
+            }
+        }
+        return handle;
+    }
+    /** Register a file object URL async */
+    public async registerFileHandleAsync<HandleType>(
+        name: string,
+        handle: HandleType,
+        protocol: DuckDBDataProtocol,
+        directIO: boolean,
+    ): Promise<void> {
+        const handle_inner = await this.prepareFileHandleAsync(name, handle, protocol, directIO);
+        this.registerFileHandle(name, handle_inner, protocol, directIO);
+    }
     /** Register a file object URL */
     public async registerFileHandle<HandleType>(
         name: string,
@@ -490,6 +608,9 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
         dropResponseBuffers(this.mod);
         globalThis.DUCKDB_RUNTIME._files = (globalThis.DUCKDB_RUNTIME._files || new Map()).set(name, handle);
+        if (globalThis.DUCKDB_RUNTIME._preparedHandles?.[name]) {
+            delete globalThis.DUCKDB_RUNTIME._preparedHandles[name];
+        }
         if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
             const opfsHandle: OPFSFileHandle = handle as any;
             const { fileHandle } = opfsHandle;
@@ -576,6 +697,13 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
 
     /** Enable tracking of file statistics */
+    public registerOPFSFileName(file: string): Promise<void> {
+        if (file.startsWith('opfs://')) {
+            return this.prepareFileHandle(file, DuckDBDataProtocol.BROWSER_FSACCESS);
+        } else {
+            throw new Error('Not an OPFS file name: ' + file);
+        }
+    }
     public collectFileStatistics(file: string, enable: boolean): void {
         const [s, d, n] = callSRet(this.mod, 'duckdb_web_collect_file_stats', ['string', 'boolean'], [file, enable]);
         if (s !== StatusCode.SUCCESS) {

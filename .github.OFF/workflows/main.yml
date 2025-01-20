@@ -27,7 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EMSCRIPTEN_VERSION: 'latest'
+  EMSCRIPTEN_VERSION: '3.1.71'
+  EMSCRIPTEN_VERSION_COI: '3.1.57'
 
 jobs:
     clang_format:
@@ -456,7 +457,7 @@ jobs:
 
             - uses: mymindstorm/setup-emsdk@v14
               with:
-                  version: ${{ env.EMSCRIPTEN_VERSION }}
+                  version: ${{ env.EMSCRIPTEN_VERSION_COI }}
 
             - name: Setup Ccache
               uses: hendrikmuhs/ccache-action@main
@@ -586,7 +587,7 @@ jobs:
 
             - uses: mymindstorm/setup-emsdk@v14
               with:
-                  version: ${{ env.EMSCRIPTEN_VERSION }}
+                  version: ${{ env.EMSCRIPTEN_VERSION_COI }}
 
             - name: Setup Ccache
               uses: hendrikmuhs/ccache-action@main
@@ -1070,7 +1071,14 @@ jobs:
 
             - name: Measure NPM stats
               run: |
-                  ./scripts/npm_measure_lib.sh || true
+                  ./scripts/npm_measure_lib.sh
+
+            - name: Deploy GitHub Page
+              if: github.ref == 'refs/heads/main'
+              run: |
+                  git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+                  git fetch origin gh-pages
+                  ./scripts/deploy_pages.sh
 
             - name: Publish to NPM
               env:
@@ -1082,13 +1090,6 @@ jobs:
                   ./scripts/npm_publish_lib.sh
                   ./scripts/npm_publish_shell.sh
                   ./scripts/npm_publish_react.sh
-
-            - name: Deploy GitHub Page
-              if: github.ref == 'refs/heads/main'
-              run: |
-                  git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
-                  git fetch origin gh-pages
-                  ./scripts/deploy_pages.sh
 
     merge_reports:
         name: Merge benchmark reports

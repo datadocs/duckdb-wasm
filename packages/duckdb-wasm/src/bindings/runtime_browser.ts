@@ -13,28 +13,34 @@ import {
     getDataProtocolName,
     OpenedFile,
     readString,
+    PreparedDBFileHandle,
 } from './runtime';
 import { assertOPFSHandle, OPFSFileHandle } from './opfs';
 import { DuckDBModule } from './duckdb_module';
 import * as udf from './udf_runtime';
 
 const logWASMCall = typeof process !== 'undefined' && !!process.env.KEEP_DEBUG_LOGS;
+const OPFS_PREFIX_LEN = 'opfs://'.length;
+const PATH_SEP_REGEX = /\/|\\/;
 
-export type DuckDBBrowserRuntime = DuckDBRuntime & {
+export const BROWSER_RUNTIME: DuckDBRuntime & {
+    _files: Map<string, any>;
     _fileInfoCache: Map<number, DuckDBFileInfo>;
     _globalFileInfo: DuckDBGlobalFileInfo | null;
-    /** Internal method for closing a file from given file info */
-    _closeFile(mod: DuckDBModule, file: DuckDBFileInfo): void;
+    _preparedHandles: Record<string, FileSystemSyncAccessHandle>;
+    _opfsRoot: FileSystemDirectoryHandle | null;
+
     getFileInfo(mod: DuckDBModule, fileId: number): DuckDBFileInfo | null;
     getFileInfoByName(mod: DuckDBModule, fileName: string): DuckDBFileInfo | null;
     getGlobalFileInfo(mod: DuckDBModule): DuckDBGlobalFileInfo | null;
-};
-export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
-    /** Mapping from file path to file handle */
+    assignOPFSRoot(): Promise<void>;
+} = {
     _files: new Map<string, any>(),
     _fileInfoCache: new Map<number, DuckDBFileInfo>(),
     _udfFunctions: new Map(),
     _globalFileInfo: null,
+    _preparedHandles: {} as any,
+    _opfsRoot: null,
 
     getFileInfo(mod: DuckDBModule, fileId: number): DuckDBFileInfo | null {
         if (typeof fileId !== 'number' || fileId < 0) return null;
@@ -61,6 +67,10 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                 }
                 const file = { ...info, blob: null } as DuckDBFileInfo;
                 BROWSER_RUNTIME._fileInfoCache.set(fileId, file);
+                if (!BROWSER_RUNTIME._files.has(file.fileName) && BROWSER_RUNTIME._preparedHandles[file.fileName]) {
+                    BROWSER_RUNTIME._files.set(file.fileName, BROWSER_RUNTIME._preparedHandles[file.fileName]);
+                    delete BROWSER_RUNTIME._preparedHandles[file.fileName];
+                }
                 return file;
             } catch (error) {
                 console.warn(error);
@@ -121,6 +131,75 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
             console.log(e);
             return null;
         }
+    },
+    async assignOPFSRoot(): Promise<void> {
+        if (!BROWSER_RUNTIME._opfsRoot) {
+            BROWSER_RUNTIME._opfsRoot = await navigator.storage.getDirectory();
+        }
+    },
+    /** Prepare a file handle that could only be acquired aschronously */
+    async prepareFileHandles(filePaths: string[], protocol: DuckDBDataProtocol): Promise<PreparedDBFileHandle[]> {
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS) {
+            await BROWSER_RUNTIME.assignOPFSRoot();
+            const prepare = async (path: string): Promise<PreparedDBFileHandle> => {
+                if (BROWSER_RUNTIME._files.has(path)) {
+                    return {
+                        path,
+                        handle: BROWSER_RUNTIME._files.get(path),
+                        fromCached: true,
+                    };
+                }
+                const opfsRoot = BROWSER_RUNTIME._opfsRoot!;
+                let dirHandle: FileSystemDirectoryHandle = opfsRoot;
+                // check if mkdir -p is needed
+                const opfsPath = path.slice(OPFS_PREFIX_LEN);
+                let fileName = opfsPath;
+                if (PATH_SEP_REGEX.test(opfsPath)) {
+                    const folders = opfsPath.split(PATH_SEP_REGEX);
+                    fileName = folders.pop()!;
+                    if (!fileName) {
+                        throw new Error(`Invalid path ${path}`);
+                    }
+                    // mkdir -p
+                    for (const folder of folders) {
+                        dirHandle = await dirHandle.getDirectoryHandle(folder, { create: true });
+                    }
+                }
+                const fileHandle = await dirHandle.getFileHandle(fileName, { create: false }).catch(e => {
+                    if (e?.name === 'NotFoundError') {
+                        console.debug(`File ${path} does not exists yet, creating...`);
+                        return dirHandle.getFileHandle(fileName, { create: true });
+                    }
+                    throw e;
+                });
+                try {
+                    const handle = await fileHandle.createSyncAccessHandle();
+                    BROWSER_RUNTIME._preparedHandles[path] = handle;
+                    return {
+                        path,
+                        handle,
+                        fromCached: false,
+                    };
+                } catch (e: any) {
+                    throw new Error(e.message + ':' + name);
+                }
+            };
+            const result: PreparedDBFileHandle[] = [];
+            for (const filePath of filePaths) {
+                const res = await prepare(filePath);
+                result.push(res);
+            }
+            return result;
+        }
+        throw new Error(`Unsupported protocol ${protocol} for paths ${filePaths} with protocol ${protocol}`);
+    },
+    /** Prepare a file handle that could only be acquired aschronously */
+    async prepareDBFileHandle(dbPath: string, protocol: DuckDBDataProtocol): Promise<PreparedDBFileHandle[]> {
+        if (protocol === DuckDBDataProtocol.BROWSER_FSACCESS && this.prepareFileHandles) {
+            const filePaths = [dbPath, `${dbPath}.wal`];
+            return this.prepareFileHandles(filePaths, protocol);
+        }
+        throw new Error(`Unsupported protocol ${protocol} for path ${dbPath} with protocol ${protocol}`);
     },
 
     testPlatformFeature: (_mod: DuckDBModule, feature: number): boolean => {
@@ -193,32 +272,31 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     let contentLength = null;
                     let error: any | null = null;
                     if (file.reliableHeadRequests || !file.allowFullHttpReads) {
-                    try {
-                        // Send a dummy HEAD request with range protocol
-                        //          -> good IFF status is 206 and contentLenght is present
-                        const xhr = new XMLHttpRequest();
-                        if (file.dataProtocol == DuckDBDataProtocol.S3) {
-                            xhr.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
-                            addS3Headers(xhr, file.s3Config, file.dataUrl!, 'HEAD');
-                        } else {
-                            xhr.open('HEAD', file.dataUrl!, false);
-                        }
-                        xhr.setRequestHeader('Range', `bytes=0-`);
-                        xhr.send(null);
+                        try {
+                            // Send a dummy HEAD request with range protocol
+                            //          -> good IFF status is 206 and contentLenght is present
+                            const xhr = new XMLHttpRequest();
+                            if (file.dataProtocol == DuckDBDataProtocol.S3) {
+                                xhr.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
+                                addS3Headers(xhr, file.s3Config, file.dataUrl!, 'HEAD');
+                            } else {
+                                xhr.open('HEAD', file.dataUrl!, false);
+                            }
+                            xhr.setRequestHeader('Range', `bytes=0-`);
+                            xhr.send(null);
 
-                        // Supports range requests
-                        contentLength = xhr.getResponseHeader('Content-Length');
-                        if (contentLength !== null && xhr.status == 206) {
-                            const result = mod._malloc(2 * 8);
-                            mod.HEAPF64[(result >> 3) + 0] = +contentLength;
-                            mod.HEAPF64[(result >> 3) + 1] = 0;
-                            return result;
+                            // Supports range requests
+                            contentLength = xhr.getResponseHeader('Content-Length');
+                            if (contentLength !== null && xhr.status == 206) {
+                                const result = mod._malloc(2 * 8);
+                                mod.HEAPF64[(result >> 3) + 0] = +contentLength;
+                                mod.HEAPF64[(result >> 3) + 1] = 0;
+                                return result;
+                            }
+                        } catch (e: any) {
+                            error = e;
+                            console.warn(`HEAD request with range header failed: ${e}`);
                         }
-
-                    } catch (e: any) {
-                        error = e;
-                        console.warn(`HEAD request with range header failed: ${e}`);
-                    }
                     }
 
                     // Try to fallback to full read?
@@ -264,13 +342,23 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                                 }
                             }
 
-                            if (xhr.status == 206 && contentLength2 !== null && +contentLength2 == 1 && presumedLength !== null) {
+                            if (
+                                xhr.status == 206 &&
+                                contentLength2 !== null &&
+                                +contentLength2 == 1 &&
+                                presumedLength !== null
+                            ) {
                                 const result = mod._malloc(2 * 8);
                                 mod.HEAPF64[(result >> 3) + 0] = +presumedLength;
                                 mod.HEAPF64[(result >> 3) + 1] = 0;
                                 return result;
                             }
-                            if (xhr.status == 200 && contentLength2 !== null && contentLength !== null && +contentLength2 == +contentLength) {
+                            if (
+                                xhr.status == 200 &&
+                                contentLength2 !== null &&
+                                contentLength !== null &&
+                                +contentLength2 == +contentLength
+                            ) {
                                 console.warn(`fall back to full HTTP read for: ${file.dataUrl}`);
                                 const data = mod._malloc(xhr.response.byteLength);
                                 const src = new Uint8Array(xhr.response, 0, xhr.response.byteLength);
@@ -330,19 +418,18 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     return result;
                 }
                 case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                    // OPFS
-                    // Actually the following code is not usable in main thread but a WebWorker.
-                    // This is the reason why there is another API named `openFileAsync`
-                    const handle: OPFSFileHandle = BROWSER_RUNTIME._files!.get(fileName);
-                    if (!handle?.fileHandle || !handle?.file)
-                        throw new Error(`Invalid file handle of the file "${fileName}"`);
-                    if (!handle.accessHandle)
-                        throw new Error(`Performing openFile on OPFS file should be with an accessHandle`);
-                    return new OpenedFile(handle.file.size, 0).getCppPointer(mod);
-                }
-                default: {
-                    const name = getDataProtocolName(file?.dataProtocol);
-                    throw new Error(`Unsupported protocol for openFile: "${name}"`);
+                    const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files?.get(file.fileName);
+                    if (!handle) {
+                        throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                    }
+                    if (flags & FileFlags.FILE_FLAGS_FILE_CREATE_NEW) {
+                        handle.truncate(0);
+                    }
+                    const result = mod._malloc(2 * 8);
+                    const fileSize = handle.getSize();
+                    mod.HEAPF64[(result >> 3) + 0] = fileSize;
+                    mod.HEAPF64[(result >> 3) + 1] = 0;
+                    return result;
                 }
             }
         } catch (e: any) {
@@ -400,6 +487,12 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     }
                 }
                 mod.ccall('duckdb_web_fs_glob_add_path', null, ['string'], [path]);
+            } else {
+                for (const [filePath] of BROWSER_RUNTIME._files!.entries() || []) {
+                    if (filePath.startsWith(path)) {
+                        mod.ccall('duckdb_web_fs_glob_add_path', null, ['string'], [filePath]);
+                    }
+                }
             }
         } catch (e: any) {
             console.log(e);
@@ -433,6 +526,8 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                 }
                 xhr.send(null);
                 return xhr.status == 206 || xhr.status == 200;
+            } else {
+                return BROWSER_RUNTIME._files.has(path);
             }
 
             if (handle) return true;
@@ -446,42 +541,45 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
     },
     closeFile: (mod: DuckDBModule, fileId: number) => {
         const file = BROWSER_RUNTIME.getFileInfo(mod, fileId);
-        if (!file) return;
-        if (logWASMCall)
-            console.log(
-                `[WASM-CALL] closeFile("${file.fileName}", protocol=${getDataProtocolName(file.dataProtocol)})`,
-            );
-        return BROWSER_RUNTIME._closeFile(mod, file);
-    },
-    closeFileByName: (mod: DuckDBModule, fileName: string) => {
-        const file = BROWSER_RUNTIME.getFileInfoByName(mod, fileName);
-        if (!file) {
-            return false;
-        }
-        BROWSER_RUNTIME._closeFile(mod, file);
-        return true;
-    },
-    _closeFile: (mod: DuckDBModule, file: DuckDBFileInfo) => {
-        BROWSER_RUNTIME._fileInfoCache.delete(file.fileId);
-        switch (file.dataProtocol) {
-            case DuckDBDataProtocol.BUFFER:
-            case DuckDBDataProtocol.HTTP:
-            case DuckDBDataProtocol.S3:
-                break;
-            case DuckDBDataProtocol.NODE_FS:
-            case DuckDBDataProtocol.BROWSER_FILEREADER:
-                // XXX Remove from registry
-                return;
-            case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                const fileName = file.fileName;
-                const handle: OPFSFileHandle = BROWSER_RUNTIME._files?.get(fileName);
-                if (handle.accessHandle) {
-                    handle.accessHandle.flush();
-                    handle.accessHandle.close();
-                    handle.accessHandle = undefined;
-                    console.log(`closed OPFS file "${handle._url}"`);
+        BROWSER_RUNTIME._fileInfoCache.delete(fileId);
+        try {
+            switch (file?.dataProtocol) {
+                case DuckDBDataProtocol.BUFFER:
+                case DuckDBDataProtocol.HTTP:
+                case DuckDBDataProtocol.S3:
+                    break;
+                case DuckDBDataProtocol.NODE_FS:
+                case DuckDBDataProtocol.BROWSER_FILEREADER:
+                    // XXX Remove from registry
+                    return;
+                case DuckDBDataProtocol.BROWSER_FSACCESS: {
+                    const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files?.get(file.fileName);
+                    if (!handle) {
+                        throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                    }
+                    return;
                 }
-                return;
+            }
+        } catch (e: any) {
+            console.log(e);
+            failWith(mod, e.toString());
+        }
+    },
+    dropFile: (mod: DuckDBModule, fileNamePtr: number, fileNameLen: number) => {
+        const fileName = readString(mod, fileNamePtr, fileNameLen);
+        const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files?.get(fileName);
+        if (handle) {
+            BROWSER_RUNTIME._files.delete(fileName);
+            if (handle instanceof FileSystemSyncAccessHandle) {
+                try {
+                    handle.flush();
+                    handle.close();
+                } catch (e: any) {
+                    throw new Error(`Cannot drop file with name: ${fileName}`);
+                }
+            }
+            if (handle instanceof Blob) {
+                // nothing
             }
         }
     },
@@ -582,21 +680,12 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                     return data.byteLength;
                 }
                 case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                    const fileName = file.fileName;
-                    const handle = BROWSER_RUNTIME._files?.get(fileName);
-                    assertOPFSHandle('readFile', fileName, handle, true);
-                    // const out = mod.HEAPU8.subarray(buf, buf + bytes);
-                    const data = new Uint8Array(bytes);
-                    const num = handle.accessHandle.read(data, { at: location });
-                    // if (logWASMCall) {
-                    //     const header = [data.at(0), data.at(1)]
-                    //         .filter(it => typeof it === 'number')
-                    //         .map(it => it!.toString(16))
-                    //         .join(',');
-                    //     console.log(`[WASM-CALL] accessHandle.read("${fileName}", ${location}, ${header})`);
-                    // }
-                    mod.HEAPU8.set(data, buf);
-                    return num;
+                    const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files.get(file.fileName);
+                    if (!handle) {
+                        throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                    }
+                    const out = mod.HEAPU8.subarray(buf, buf + bytes);
+                    return handle.read(out, { at: location });
                 }
             }
             return 0;
@@ -635,12 +724,13 @@ export const BROWSER_RUNTIME: DuckDBBrowserRuntime = {
                 failWith(mod, 'cannot write using the html5 file reader api');
                 return 0;
             case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                const handle = BROWSER_RUNTIME._files?.get(fileName);
-                assertOPFSHandle('writeFile', fileName, handle, true);
+                const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files?.get(file.fileName);
+                if (!handle) {
+                    throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                }
                 const input = mod.HEAPU8.subarray(buf, buf + bytes);
-                const access = handle.accessHandle;
-                const num = access.write(input, { at: location });
-                if (logWASMCall) console.log(`[WASM-CALL] writeFile => ${num}; size=${access.getSize()}`);
+                const num = handle.write(input, { at: location });
+                if (logWASMCall) console.log(`[WASM-CALL] writeFile => ${num}; size=${handle.getSize()}`);
                 return num;
             }
         }

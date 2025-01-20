@@ -1,4 +1,4 @@
-import { DuckDBBindings } from '../bindings';
+import { DuckDBBindings, DuckDBDataProtocol } from '../bindings';
 import {
     WorkerResponseVariant,
     WorkerRequestVariant,
@@ -155,10 +155,16 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     this.sendOK(request);
                     break;
 
-                case WorkerRequestType.OPEN:
+                case WorkerRequestType.OPEN: {
+                    const path = request.data.path;
+                    if (path?.startsWith('opfs://')) {
+                        await this._bindings.prepareDBFileHandle(path, DuckDBDataProtocol.BROWSER_FSACCESS);
+                        request.data.useDirectIO = true;
+                    }
                     this._bindings.open(request.data);
                     this.sendOK(request);
                     break;
+                }
                 case WorkerRequestType.DROP_FILE:
                     this._bindings.dropFile(request.data);
                     this.sendOK(request);
@@ -251,7 +257,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     break;
                 }
                 case WorkerRequestType.START_PENDING_QUERY: {
-                    const result = this._bindings.startPendingQuery(request.data[0], request.data[1]);
+                    const result = this._bindings.startPendingQuery(request.data[0], request.data[1], request.data[2]);
                     const transfer = [];
                     if (result) {
                         transfer.push(result.buffer);
@@ -361,7 +367,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     break;
 
                 case WorkerRequestType.REGISTER_FILE_HANDLE:
-                    await this._bindings.registerFileHandle(
+                    await this._bindings.registerFileHandleAsync(
                         request.data[0],
                         request.data[1],
                         request.data[2],
@@ -390,6 +396,11 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                 }
                 case WorkerRequestType.COLLECT_FILE_STATISTICS:
                     this._bindings.collectFileStatistics(request.data[0], request.data[1]);
+                    this.sendOK(request);
+                    break;
+
+                case WorkerRequestType.REGISTER_OPFS_FILE_NAME:
+                    this._bindings.registerOPFSFileName(request.data[0]);
                     this.sendOK(request);
                     break;
 

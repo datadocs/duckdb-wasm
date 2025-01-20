@@ -68,7 +68,10 @@ export enum FileFlags {
  * from C++ source file: lib/src/io/web_filesystem.cc
  */
 export class OpenedFile {
-    constructor(readonly fileSize: number, readonly fileBufferPtr = 0) { }
+    constructor(
+        readonly fileSize: number,
+        readonly fileBufferPtr = 0,
+    ) {}
     getCppPointer(mod: EmscriptenModule) {
         const ptr = mod._malloc(2 * 8); // 2 double variables
         mod.HEAPF64[(ptr >> 3) + 0] = this.fileSize; // the first double is file_size
@@ -107,6 +110,11 @@ export interface DuckDBGlobalFileInfo {
 }
 
 export type CallSRetResult = [status: number, dataPtr: number, dataSize: number];
+export interface PreparedDBFileHandle {
+    path: string;
+    handle: any;
+    fromCached: boolean;
+}
 
 /** Call a function with packed response buffer */
 export function callSRet(
@@ -157,6 +165,7 @@ export interface DuckDBRuntime {
     syncFile(mod: DuckDBModule, fileId: number): void;
     closeFile(mod: DuckDBModule, fileId: number): void;
     closeFileByName?(mod: DuckDBModule, fileName: string): boolean;
+    dropFile(mod: DuckDBModule, fileNamePtr: number, fileNameLen: number): void;
     getLastFileModificationTime(mod: DuckDBModule, fileId: number): number;
     truncateFile(mod: DuckDBModule, fileId: number, newSize: number): void;
     readFile(mod: DuckDBModule, fileId: number, buffer: number, bytes: number, location: number): number;
@@ -171,6 +180,11 @@ export interface DuckDBRuntime {
     moveFile(mod: DuckDBModule, fromPtr: number, fromLen: number, toPtr: number, toLen: number): void;
     checkFile(mod: DuckDBModule, pathPtr: number, pathLen: number, urlPtr?: number, urlLen?: number): boolean;
     removeFile(mod: DuckDBModule, pathPtr: number, pathLen: number): void;
+
+    // Prepare a file handle that could only be acquired aschronously
+    prepareFileHandle?: (path: string, protocol: DuckDBDataProtocol) => Promise<PreparedDBFileHandle[]>;
+    prepareFileHandles?: (path: string[], protocol: DuckDBDataProtocol) => Promise<PreparedDBFileHandle[]>;
+    prepareDBFileHandle?: (path: string, protocol: DuckDBDataProtocol) => Promise<PreparedDBFileHandle[]>;
 
     // Call a scalar UDF function
     callScalarUDF(
@@ -194,6 +208,7 @@ export const DEFAULT_RUNTIME: DuckDBRuntime = {
     closeFile: (_mod: DuckDBModule, _fileId: number): void => {},
     closeFileByName: (_mod: DuckDBModule, _fileName: string) => false,
 
+    dropFile: (_mod: DuckDBModule, _fileNamePtr: number, _fileNameLen: number): void => {},
     getLastFileModificationTime: (_mod: DuckDBModule, _fileId: number): number => {
         return 0;
     },
