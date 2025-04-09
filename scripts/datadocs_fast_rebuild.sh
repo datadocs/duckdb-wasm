@@ -67,7 +67,6 @@ pushd "$( dirname -- "${BASH_SOURCE[0]}" )/.." >/dev/null || exit 1;
 #region core
 
 execute mkdir -p .ccache/extension;
-execute touch .ccache/extension/excel;
 execute touch .ccache/extension/json;
 execute touch .ccache/extension/datadocs;
 
