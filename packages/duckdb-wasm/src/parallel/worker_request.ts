@@ -22,6 +22,7 @@ export enum WorkerRequestType {
     DISCONNECT = 'DISCONNECT',
     DROP_FILE = 'DROP_FILE',
     DROP_FILES = 'DROP_FILES',
+    // CLOSE_FILE = 'CLOSE_FILE',
     EXPORT_FILE_STATISTICS = 'EXPORT_FILE_STATISTICS',
     FETCH_QUERY_RESULTS = 'FETCH_QUERY_RESULTS',
     FLUSH_FILES = 'FLUSH_FILES',
@@ -145,6 +146,12 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.START_PENDING_QUERY, [number, string, boolean]>
     | WorkerRequest<WorkerRequestType.TOKENIZE, string>;
 
+export type WorkerResponseTypeVariant = WorkerResponseVariant['type'];
+export type WorkerResponseDataType<
+    ResponseType extends WorkerResponseTypeVariant,
+    Variant = WorkerResponseVariant,
+> = Variant extends WorkerResponse<ResponseType, infer DataType> ? DataType : never;
+
 export type WorkerResponseVariant =
     | WorkerResponse<WorkerResponseType.CONNECTION_INFO, number>
     | WorkerResponse<WorkerResponseType.ERROR, any>
@@ -179,6 +186,7 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.DISCONNECT, ConnectionID, null>
     | WorkerTask<WorkerRequestType.DROP_FILE, string, null>
     | WorkerTask<WorkerRequestType.DROP_FILES, null, null>
+    // | WorkerTask<WorkerRequestType.CLOSE_FILE, string, boolean>
     | WorkerTask<WorkerRequestType.EXPORT_FILE_STATISTICS, string, FileStatistics>
     | WorkerTask<WorkerRequestType.FETCH_QUERY_RESULTS, ConnectionID, Uint8Array>
     | WorkerTask<WorkerRequestType.FLUSH_FILES, null, null>
