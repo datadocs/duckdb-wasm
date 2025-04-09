@@ -271,6 +271,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                 }
                 break;
             case WorkerRequestType.CANCEL_PENDING_QUERY:
+                // case WorkerRequestType.CLOSE_FILE:
                 this._onInstantiationProgress = [];
                 if (response.type == WorkerResponseType.SUCCESS) {
                     task.promiseResolver(response.data);
@@ -336,6 +337,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         const task = new WorkerTask<WorkerRequestType.FLUSH_FILES, null, null>(WorkerRequestType.FLUSH_FILES, null);
         return await this.postTask(task);
     }
+    // public async closeFile(name: string): Promise<boolean> {
+    //     const task = new WorkerTask<WorkerRequestType.CLOSE_FILE, string, boolean>(WorkerRequestType.CLOSE_FILE, name);
+    //     return await this.postTask(task);
+    // }
 
     /** Open the database */
     public async instantiate(

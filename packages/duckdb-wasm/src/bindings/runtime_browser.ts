@@ -30,6 +30,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     _opfsRoot: FileSystemDirectoryHandle | null;
 
     getFileInfo(mod: DuckDBModule, fileId: number): DuckDBFileInfo | null;
+    getFileInfoByName(mod: DuckDBModule, fileName: string): DuckDBFileInfo | null;
     getGlobalFileInfo(mod: DuckDBModule): DuckDBGlobalFileInfo | null;
     assignOPFSRoot(): Promise<void>;
 } = {
@@ -76,6 +77,28 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
             }
         } catch (e: any) {
             console.log(e);
+            return null;
+        }
+    },
+    getFileInfoByName(mod: DuckDBModule, fileName: string): DuckDBFileInfo | null {
+        if (typeof fileName !== 'string' || fileName.length === 0) return null;
+        try {
+            const [s, d, n] = callSRet(mod, 'duckdb_web_fs_get_file_info_by_name', ['string', 'number'], [fileName, 0]);
+            if (s !== StatusCode.SUCCESS) {
+                return null;
+            } else if (n === 0) {
+                throw new Error(`Failed to resolve the file info from "${fileName}"`);
+            }
+            const infoStr = readString(mod, d, n);
+            dropResponseBuffers(mod);
+            const info = JSON.parse(infoStr);
+            if (info == null) {
+                return null;
+            }
+            const file = { ...info, blob: null } as DuckDBFileInfo;
+            return file;
+        } catch (e: any) {
+            console.error(e);
             return null;
         }
     },
@@ -420,8 +443,10 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
         return 0;
     },
     glob: (mod: DuckDBModule, pathPtr: number, pathLen: number) => {
+        // TODO: support OPFS
         try {
             const path = readString(mod, pathPtr, pathLen);
+            if (logWASMCall) console.log(`[WASM-CALL] glob("${path}")`);
             // Starts with http?
             // Try a HTTP HEAD request
             if (path.startsWith('http') || path.startsWith('s3://')) {
@@ -504,7 +529,9 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
         }
         return false;
     },
-    syncFile: (_mod: DuckDBModule, _fileId: number) => {},
+    syncFile: (_mod: DuckDBModule, _fileId: number) => {
+        // this API is unused in duckdb-wasm C++ source code
+    },
     closeFile: (mod: DuckDBModule, fileId: number) => {
         const file = BROWSER_RUNTIME.getFileInfo(mod, fileId);
         BROWSER_RUNTIME._fileInfoCache.delete(fileId);
@@ -732,20 +759,20 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     },
     checkDirectory: (mod: DuckDBModule, pathPtr: number, pathLen: number) => {
         const path = readString(mod, pathPtr, pathLen);
-        console.log(`checkDirectory: ${path}`);
+        if (logWASMCall) console.log(`[WASM-CALL] checkDirectory("${path}")`);
         return false;
     },
     createDirectory: (mod: DuckDBModule, pathPtr: number, pathLen: number) => {
         const path = readString(mod, pathPtr, pathLen);
-        console.log(`createDirectory: ${path}`);
+        if (logWASMCall) console.log(`[WASM-CALL] createDirectory("${path}")`);
     },
     removeDirectory: (mod: DuckDBModule, pathPtr: number, pathLen: number) => {
         const path = readString(mod, pathPtr, pathLen);
-        console.log(`removeDirectory: ${path}`);
+        if (logWASMCall) console.log(`[WASM-CALL] removeDirectory("${path}")`);
     },
     listDirectoryEntries: (mod: DuckDBModule, pathPtr: number, pathLen: number) => {
         const path = readString(mod, pathPtr, pathLen);
-        console.log(`listDirectoryEntries: ${path}`);
+        if (logWASMCall) console.log(`[WASM-CALL] listDirectoryEntries("${path}")`);
         return false;
     },
     moveFile: (mod: DuckDBModule, fromPtr: number, fromLen: number, toPtr: number, toLen: number) => {

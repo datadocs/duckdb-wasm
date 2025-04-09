@@ -1,5 +1,12 @@
 import { DuckDBBindings, DuckDBDataProtocol } from '../bindings';
-import { WorkerResponseVariant, WorkerRequestVariant, WorkerRequestType, WorkerResponseType } from './worker_request';
+import {
+    WorkerResponseVariant,
+    WorkerRequestVariant,
+    WorkerRequestType,
+    WorkerResponseType,
+    WorkerResponseTypeVariant,
+    WorkerResponseDataType,
+} from './worker_request';
 import { Logger, LogEntryVariant } from '../log';
 import { InstantiationProgress } from '../bindings/progress';
 
@@ -63,6 +70,20 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
             [],
         );
         return;
+    }
+
+    protected sendRaw<RespType extends WorkerResponseTypeVariant>(
+        request: WorkerRequestVariant,
+        type: RespType,
+        data: WorkerResponseDataType<RespType>,
+    ): void {
+        const msg: WorkerResponseVariant = {
+            messageId: this._nextMessageId++,
+            requestId: request.messageId,
+            type,
+            data: data as any,
+        };
+        this.postMessage(msg, []);
     }
 
     /** Process a request from the main thread */
@@ -156,6 +177,11 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     this._bindings.flushFiles();
                     this.sendOK(request);
                     break;
+                // case WorkerRequestType.CLOSE_FILE: {
+                //     const result = this._bindings.closeFile(request.data);
+                //     this.sendRaw(request, WorkerResponseType.SUCCESS, result);
+                //     break;
+                // }
                 case WorkerRequestType.CONNECT: {
                     const conn = this._bindings.connect();
                     this.postMessage(

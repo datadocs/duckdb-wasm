@@ -60,6 +60,7 @@ export interface DuckDBBindings {
     dropFile(name: string): void;
     dropFiles(): void;
     flushFiles(): void;
+    // closeFile(name: string): boolean;
     copyFileToPath(name: string, path: string): void;
     copyFileToBuffer(name: string): Uint8Array;
     registerOPFSFileName(file: string): void;
