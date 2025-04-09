@@ -14,6 +14,9 @@ import { WebFile } from './web_file';
 import { UDFFunction, UDFFunctionDeclaration } from './udf_function';
 import * as arrow from 'apache-arrow';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const logWASMCall = !!process.env.KEEP_DEBUG_LOGS;
+
 const TEXT_ENCODER = new TextEncoder();
 
 declare global {
@@ -629,9 +632,19 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
         dropResponseBuffers(this.mod);
     }
+
     /** Flush all files */
-    public flushFiles(): void {
+    public flushFiles() {
         this.mod.ccall('duckdb_web_flush_files', null, [], []);
+        // const entries = this._runtime._files?.entries();
+        // if (!entries) return;
+        // for (const [fileName, handle] of entries) {
+        //     if ((handle as OPFSFileHandle).accessHandle) {
+        //         if (logWASMCall) console.log(`[WASM-CALL] flushFiles() => flushFile("${fileName}")`);
+        //         const opfs: OPFSFileHandle = handle;
+        //         if (opfs.accessHandle) opfs.accessHandle.flush();
+        //     }
+        // }
     }
     /** Write a file to a path */
     public copyFileToPath(name: string, path: string): void {

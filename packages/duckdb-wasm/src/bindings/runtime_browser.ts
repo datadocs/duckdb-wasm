@@ -20,6 +20,8 @@ import * as udf from './udf_runtime';
 const OPFS_PREFIX_LEN = 'opfs://'.length;
 const PATH_SEP_REGEX = /\/|\\/;
 
+const logWASMCall = typeof process !== 'undefined' && !!process.env.KEEP_DEBUG_LOGS;
+
 export const BROWSER_RUNTIME: DuckDBRuntime & {
     _files: Map<string, any>;
     _fileInfoCache: Map<number, DuckDBFileInfo>;
@@ -39,6 +41,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     _opfsRoot: null,
 
     getFileInfo(mod: DuckDBModule, fileId: number): DuckDBFileInfo | null {
+        if (typeof fileId !== 'number' || fileId < 0) return null;
         try {
             const cached = BROWSER_RUNTIME._fileInfoCache.get(fileId);
             const [s, d, n] = callSRet(
@@ -383,7 +386,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
 
                     // Depending on file flags, return nullptr
                     if (flags & FileFlags.FILE_FLAGS_NULL_IF_NOT_EXISTS) {
-                       return 0;
+                        return 0;
                     }
 
                     // Fall back to empty buffered file in the browser
@@ -561,11 +564,15 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                 failWith(mod, `truncateFile not implemented`);
                 return;
             case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                const handle = BROWSER_RUNTIME._files?.get(file.fileName);
-                if (!handle) {
-                    throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                const fileName = file.fileName;
+                const handle = BROWSER_RUNTIME._files?.get(fileName);
+                if (logWASMCall) console.log(`[WASM-CALL] truncateFile("${fileName}", newSize=${newSize})`);
+                if (!handle) throw new Error(`No OPFS access handle registered with name: ${fileName}`);
+                try {
+                    return (handle as FileSystemSyncAccessHandle).truncate(newSize);
+                } catch (error: any) {
+                    failWith(mod, error.message);
                 }
-                return handle.truncate(newSize);
             }
         }
         return 0;
@@ -641,6 +648,10 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                     if (!handle) {
                         throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
                     }
+                    // const data = new Uint8Array(bytes);
+                    // const num = handle.read(data, { at: location });
+                    // mod.HEAPU8.set(data, buf);
+                    // return num;
                     const out = mod.HEAPU8.subarray(buf, buf + bytes);
                     return handle.read(out, { at: location });
                 }
@@ -654,6 +665,13 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     },
     writeFile: (mod: DuckDBModule, fileId: number, buf: number, bytes: number, location: number) => {
         const file = BROWSER_RUNTIME.getFileInfo(mod, fileId);
+        if (!file || typeof file.dataProtocol !== 'number') return 0;
+
+        const fileName = file.fileName;
+        if (logWASMCall) {
+            const args = `${fileName}, protocol=${file.dataProtocol}`;
+            console.log(`[WASM-CALL] writeFile(${args}, ${bytes} bytes at ${location})`);
+        }
         switch (file?.dataProtocol) {
             case DuckDBDataProtocol.HTTP:
                 failWith(mod, 'Cannot write to HTTP file');
@@ -679,7 +697,9 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                     throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
                 }
                 const input = mod.HEAPU8.subarray(buf, buf + bytes);
-                return handle.write(input, { at: location });
+                const num = handle.write(input, { at: location });
+                if (logWASMCall) console.log(`[WASM-CALL] writeFile => ${num}; at=${location}`);
+                return num;
             }
         }
         return 0;
@@ -694,7 +714,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                 }
                 return 0;
             }
-
+            // case DuckDBDataProtocol.BROWSER_FSACCESS:
             case DuckDBDataProtocol.HTTP:
             case DuckDBDataProtocol.S3:
                 return new Date().getTime();

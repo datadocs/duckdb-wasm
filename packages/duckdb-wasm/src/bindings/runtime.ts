@@ -100,13 +100,15 @@ export interface PreparedDBFileHandle {
     fromCached: boolean;
 }
 
+export type CallSRetResult = [status: number, dataPtr: number, dataSize: number];
+
 /** Call a function with packed response buffer */
 export function callSRet(
     mod: DuckDBModule,
     funcName: string,
     argTypes: Array<Emscripten.JSType>,
     args: Array<any>,
-): [number, number, number] {
+): CallSRetResult {
     const stackPointer = mod.stackSave();
 
     // Allocate the packed response buffer
