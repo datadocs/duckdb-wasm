@@ -1,8 +1,6 @@
-import {StatusCode} from '../status';
-import {
-    WorkerResponseType,
-} from '../parallel/worker_request';
-import {addS3Headers, getHTTPUrl} from '../utils';
+import { StatusCode } from '../status';
+import { WorkerResponseType } from '../parallel/worker_request';
+import { addS3Headers, getHTTPUrl } from '../utils';
 
 import {
     callSRet,
@@ -22,6 +20,7 @@ import * as udf from './udf_runtime';
 const OPFS_PREFIX_LEN = 'opfs://'.length;
 const PATH_SEP_REGEX = /\/|\\/;
 
+const logWASMCall = typeof process !== 'undefined' && !!process.env.KEEP_DEBUG_LOGS;
 
 export const BROWSER_RUNTIME: DuckDBRuntime & {
     _files: Map<string, any>;
@@ -42,6 +41,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     _opfsRoot: null,
 
     getFileInfo(mod: DuckDBModule, fileId: number): DuckDBFileInfo | null {
+        if (typeof fileId !== 'number' || fileId < 0) return null;
         try {
             const cached = BROWSER_RUNTIME._fileInfoCache.get(fileId);
             const [s, d, n] = callSRet(
@@ -100,7 +100,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
             if (info == null) {
                 return null;
             }
-            BROWSER_RUNTIME._globalFileInfo = { ...info, blob: null} as DuckDBGlobalFileInfo;
+            BROWSER_RUNTIME._globalFileInfo = { ...info, blob: null } as DuckDBGlobalFileInfo;
 
             return BROWSER_RUNTIME._globalFileInfo;
         } catch (e: any) {
@@ -111,7 +111,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     async assignOPFSRoot(): Promise<void> {
         if (!BROWSER_RUNTIME._opfsRoot) {
             BROWSER_RUNTIME._opfsRoot = await navigator.storage.getDirectory();
-	}
+        }
     },
     /** Prepare a file handle that could only be acquired aschronously */
     async prepareFileHandles(filePaths: string[], protocol: DuckDBDataProtocol): Promise<PreparedDBFileHandle[]> {
@@ -157,7 +157,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                         fromCached: false,
                     };
                 } catch (e: any) {
-                    throw new Error(e.message + ":" + name);
+                    throw new Error(e.message + ':' + name);
                 }
             };
             const result: PreparedDBFileHandle[] = [];
@@ -268,7 +268,6 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                                 mod.HEAPF64[(result >> 3) + 1] = 0;
                                 return result;
                             }
-
                         } catch (e: any) {
                             error = e;
                             console.warn(`HEAD request with range header failed: ${e}`);
@@ -318,13 +317,23 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                                 }
                             }
 
-                            if (xhr.status == 206 && contentLength2 !== null && +contentLength2 == 1 && presumedLength !== null) {
+                            if (
+                                xhr.status == 206 &&
+                                contentLength2 !== null &&
+                                +contentLength2 == 1 &&
+                                presumedLength !== null
+                            ) {
                                 const result = mod._malloc(2 * 8);
                                 mod.HEAPF64[(result >> 3) + 0] = +presumedLength;
                                 mod.HEAPF64[(result >> 3) + 1] = 0;
                                 return result;
                             }
-                            if (xhr.status == 200 && contentLength2 !== null && contentLength !== null && +contentLength2 == +contentLength) {
+                            if (
+                                xhr.status == 200 &&
+                                contentLength2 !== null &&
+                                contentLength !== null &&
+                                +contentLength2 == +contentLength
+                            ) {
                                 console.warn(`fall back to full HTTP read for: ${file.dataUrl}`);
                                 const data = mod._malloc(xhr.response.byteLength);
                                 const src = new Uint8Array(xhr.response, 0, xhr.response.byteLength);
@@ -494,24 +503,24 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     closeFile: (mod: DuckDBModule, fileId: number) => {
         const file = BROWSER_RUNTIME.getFileInfo(mod, fileId);
         BROWSER_RUNTIME._fileInfoCache.delete(fileId);
-	try {
-        switch (file?.dataProtocol) {
-            case DuckDBDataProtocol.BUFFER:
-            case DuckDBDataProtocol.HTTP:
-            case DuckDBDataProtocol.S3:
-                break;
-            case DuckDBDataProtocol.NODE_FS:
-            case DuckDBDataProtocol.BROWSER_FILEREADER:
-                // XXX Remove from registry
-                return;
-            case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files?.get(file.fileName);
-                if (!handle) {
-                    throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+        try {
+            switch (file?.dataProtocol) {
+                case DuckDBDataProtocol.BUFFER:
+                case DuckDBDataProtocol.HTTP:
+                case DuckDBDataProtocol.S3:
+                    break;
+                case DuckDBDataProtocol.NODE_FS:
+                case DuckDBDataProtocol.BROWSER_FILEREADER:
+                    // XXX Remove from registry
+                    return;
+                case DuckDBDataProtocol.BROWSER_FSACCESS: {
+                    const handle: FileSystemSyncAccessHandle = BROWSER_RUNTIME._files?.get(file.fileName);
+                    if (!handle) {
+                        throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                    }
+                    return handle.flush();
                 }
-                return handle.flush();
             }
-        }
         } catch (e: any) {
             console.log(e);
             failWith(mod, e.toString());
@@ -550,11 +559,15 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                 failWith(mod, `truncateFile not implemented`);
                 return;
             case DuckDBDataProtocol.BROWSER_FSACCESS: {
-                const handle = BROWSER_RUNTIME._files?.get(file.fileName);
-                if (!handle) {
-                    throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
+                const fileName = file.fileName;
+                const handle = BROWSER_RUNTIME._files?.get(fileName);
+                if (logWASMCall) console.log(`[WASM-CALL] truncateFile("${fileName}", newSize=${newSize})`);
+                if (!handle) throw new Error(`No OPFS access handle registered with name: ${fileName}`);
+                try {
+                    return (handle as FileSystemSyncAccessHandle).truncate(newSize);
+                } catch (error: any) {
+                    failWith(mod, error.message);
                 }
-                return handle.truncate(newSize);
             }
         }
         return 0;
@@ -630,6 +643,10 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                     if (!handle) {
                         throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
                     }
+                    // const data = new Uint8Array(bytes);
+                    // const num = handle.read(data, { at: location });
+                    // mod.HEAPU8.set(data, buf);
+                    // return num;
                     const out = mod.HEAPU8.subarray(buf, buf + bytes);
                     return handle.read(out, { at: location });
                 }
@@ -643,6 +660,13 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
     },
     writeFile: (mod: DuckDBModule, fileId: number, buf: number, bytes: number, location: number) => {
         const file = BROWSER_RUNTIME.getFileInfo(mod, fileId);
+        if (!file || typeof file.dataProtocol !== 'number') return 0;
+
+        const fileName = file.fileName;
+        if (logWASMCall) {
+            const args = `${fileName}, protocol=${file.dataProtocol}`;
+            console.log(`[WASM-CALL] writeFile(${args}, ${bytes} bytes at ${location})`);
+        }
         switch (file?.dataProtocol) {
             case DuckDBDataProtocol.HTTP:
                 failWith(mod, 'Cannot write to HTTP file');
@@ -668,7 +692,9 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                     throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
                 }
                 const input = mod.HEAPU8.subarray(buf, buf + bytes);
-                return handle.write(input, { at: location });
+                const num = handle.write(input, { at: location });
+                if (logWASMCall) console.log(`[WASM-CALL] writeFile => ${num}; at=${location}`);
+                return num;
             }
         }
         return 0;
@@ -683,7 +709,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                 }
                 return 0;
             }
-
+            // case DuckDBDataProtocol.BROWSER_FSACCESS:
             case DuckDBDataProtocol.HTTP:
             case DuckDBDataProtocol.S3:
                 return new Date().getTime();
@@ -691,9 +717,13 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
         return 0;
     },
     progressUpdate: (done: number, percentage: number, repeat: number): void => {
-	if (postMessage) {
-            postMessage({requestId: 0,  type: WorkerResponseType.PROGRESS_UPDATE,  data: {status: done?"completed":"in-progress", percentage: percentage, repetitions: repeat}});
-	}
+        if (postMessage) {
+            postMessage({
+                requestId: 0,
+                type: WorkerResponseType.PROGRESS_UPDATE,
+                data: { status: done ? 'completed' : 'in-progress', percentage: percentage, repetitions: repeat },
+            });
+        }
     },
     checkDirectory: (mod: DuckDBModule, pathPtr: number, pathLen: number) => {
         const path = readString(mod, pathPtr, pathLen);

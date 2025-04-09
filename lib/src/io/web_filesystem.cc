@@ -1007,7 +1007,7 @@ bool WebFileSystem::FileExists(const std::string &filename, optional_ptr<FileOpe
     if (iter != files_by_name_.end()) {
         std::shared_ptr<WebFileSystem::WebFile> file = iter->second;
         dataurl = (file->data_url_.value_or(""));
-        // we have to recheck OPFS files even it is found 
+        // we have to recheck OPFS files even it is found
         // (because the file handle may has flag `emptyAsAbsent`)
         if (file->data_protocol_ != DataProtocol::BROWSER_FSACCESS) return true;
     }
