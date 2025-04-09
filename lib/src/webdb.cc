@@ -48,7 +48,7 @@
 #include "duckdb/web/csv_insert_options.h"
 #include "duckdb/web/environment.h"
 #include "duckdb/web/extensions/datadocs_extension.h"
-#include "duckdb/web/extensions/excel_extension.h"
+// #include "duckdb/web/extensions/excel_extension.h"
 // #include "duckdb/web/extensions/fts_extension.h"
 #include "duckdb/web/extensions/json_extension.h"
 #include "duckdb/web/extensions/parquet_extension.h"

@@ -299,7 +299,7 @@ else()
 
   set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
   set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
-  set(EXCEL_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/excel")
+  # set(EXCEL_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/excel")
   set(DATADOCS_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/datadocs")
 
   set(DUCKDB_WEB_JSON "")
@@ -308,11 +308,11 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_JSON_EXTENSION")
   endif()
 
-  set(DUCKDB_WEB_EXCEL "")
-  if(EXISTS "${EXCEL_EXTENSION_CACHE_FILE}")
-    set(DUCKDB_WEB_EXCEL "duckdb_web_excel")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_EXCEL_EXTENSION")
-  endif()
+  # set(DUCKDB_WEB_EXCEL "")
+  # if(EXISTS "${EXCEL_EXTENSION_CACHE_FILE}")
+  #   set(DUCKDB_WEB_EXCEL "duckdb_web_excel")
+  #   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_EXCEL_EXTENSION")
+  # endif()
 
   if(ENABLE_DATADOCS_EXTENSION)
     set(DUCKDB_WEB_DATADOCS "")
@@ -323,10 +323,10 @@ else()
   endif()
 
   # duckdb_web_fts
-  target_link_libraries(duckdb_web duckdb duckdb_web_parquet ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_EXCEL} arrow ${DUCKDB_WEB_DATADOCS} rapidjson ${THREAD_LIBS})
+  target_link_libraries(duckdb_web duckdb duckdb_web_parquet ${DUCKDB_WEB_JSON} arrow ${DUCKDB_WEB_DATADOCS} rapidjson ${THREAD_LIBS})
   # target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
   target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
-  target_link_libraries(duckdb_web_excel duckdb duckdb_excel)
+  # target_link_libraries(duckdb_web_excel duckdb duckdb_excel)
   target_link_libraries(duckdb_web_json duckdb duckdb_json)
   if(ENABLE_DATADOCS_EXTENSION)
     target_link_libraries(duckdb_web_datadocs duckdb duckdb_datadocs)
@@ -445,7 +445,7 @@ if(NOT EMSCRIPTEN)
       ${CMAKE_SOURCE_DIR}/test/webdb_test.cc
       ${CMAKE_SOURCE_DIR}/test/tester.cc)
 
-  set(TEST_LIBS duckdb_web duckdb_web_parquet ${DUCKDB_WEB_EXCEL} ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} gtest gmock gflags ${THREAD_LIBS})
+  set(TEST_LIBS duckdb_web duckdb_web_parquet ${DUCKDB_WEB_JSON} ${DUCKDB_WEB_DATADOCS} gtest gmock gflags ${THREAD_LIBS})
 
   add_executable(tester ${TEST_CC})
   target_link_libraries(tester ${TEST_LIBS})

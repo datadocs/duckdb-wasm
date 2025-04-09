@@ -15,7 +15,7 @@ endif()
 set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
-set(DUCKDB_EXTENSIONS "json;core_functions;excel")
+set(DUCKDB_EXTENSIONS "json;core_functions")
 if(ENABLE_DATADOCS_EXTENSION)
   set(DUCKDB_EXTENSIONS "${DUCKDB_EXTENSIONS};datadocs")
 endif()
@@ -69,7 +69,7 @@ ExternalProject_Add(
     <INSTALL_DIR>/lib/libexpat.a
     <INSTALL_DIR>/lib/libicu.a
     <INSTALL_DIR>/lib/libzlib.a
-    <INSTALL_DIR>/lib/libexcel_extension.a
+    # <INSTALL_DIR>/lib/libexcel_extension.a
     <INSTALL_DIR>/lib/libjson_extension.a
     <INSTALL_DIR>/lib/libdatadocs_extension.a)
 

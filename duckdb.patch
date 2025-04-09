@@ -1,22 +1,53 @@
-diff --git a/src/common/arrow/arrow_converter.cpp b/src/common/arrow/arrow_converter.cpp
-index 26db9840ac..7d904aa202 100644
---- a/src/common/arrow/arrow_converter.cpp
-+++ b/src/common/arrow/arrow_converter.cpp
-@@ -138,6 +138,7 @@ void SetArrowFormat(DuckDBArrowSchemaHolder &root_holder, ArrowSchema &child, co
- 		child.format = "tdD";
- 		break;
- 	case LogicalTypeId::TIME:
-+	case LogicalTypeId::TIME_TZ:
- 		child.format = "ttu";
- 		break;
- 	case LogicalTypeId::TIMESTAMP:
-diff --git a/src/function/table/system/test_all_types.cpp b/src/function/table/system/test_all_types.cpp
-index a0b856266c..59761509a4 100644
---- a/src/function/table/system/test_all_types.cpp
-+++ b/src/function/table/system/test_all_types.cpp
-@@ -204,13 +204,14 @@ vector<TestType> TestAllTypesFun::GetTestTypes(bool use_large_enum) {
- 	auto max_map_value = Value::MAP(ListType::GetChildType(map_type), map_values);
- 	result.emplace_back(map_type, "map", std::move(min_map_value), std::move(max_map_value));
+diff --git a/src/include/duckdb/common/file_open_flags.hpp b/src/include/duckdb/common/file_open_flags.hpp
+index d0509a214b..1b5107e849 100644
+--- a/src/include/duckdb/common/file_open_flags.hpp
++++ b/src/include/duckdb/common/file_open_flags.hpp
+@@ -100,8 +100,9 @@ public:
+ 		return flags & FILE_FLAGS_PARALLEL_ACCESS;
+ 	}
+ 
+-private:
+ 	idx_t flags = 0;
++
++private:
+ 	FileLockType lock = FileLockType::NO_LOCK;
+ 	FileCompressionType compression = FileCompressionType::UNCOMPRESSED;
+ };
+
+diff --git a/src/include/duckdb/main/extension_install_info.hpp b/src/include/duckdb/main/extension_install_info.hpp
+index 64b7b520a7..b03f64b3aa 100644
+--- a/src/include/duckdb/main/extension_install_info.hpp
++++ b/src/include/duckdb/main/extension_install_info.hpp
+@@ -49,9 +49,9 @@ public:
+ 
+ struct ExtensionRepository {
+ 	//! All currently available repositories
+-	static constexpr const char *CORE_REPOSITORY_URL = "http://extensions.duckdb.org";
+-	static constexpr const char *CORE_NIGHTLY_REPOSITORY_URL = "http://nightly-extensions.duckdb.org";
+-	static constexpr const char *COMMUNITY_REPOSITORY_URL = "http://community-extensions.duckdb.org";
++	static constexpr const char *CORE_REPOSITORY_URL = "https://extensions.duckdb.org";
++	static constexpr const char *CORE_NIGHTLY_REPOSITORY_URL = "https://nightly-extensions.duckdb.org";
++	static constexpr const char *COMMUNITY_REPOSITORY_URL = "https://community-extensions.duckdb.org";
+ 
+ 	//! Debugging repositories (target local, relative paths that are produced by DuckDB's build system)
+ 	static constexpr const char *BUILD_DEBUG_REPOSITORY_PATH = "./build/debug/repository";
+diff --git a/src/main/extension/extension_helper.cpp b/src/main/extension/extension_helper.cpp
+index 37b3cd1aa0..b91f0059b4 100644
+--- a/src/main/extension/extension_helper.cpp
++++ b/src/main/extension/extension_helper.cpp
+@@ -302,7 +302,6 @@ vector<ExtensionUpdateResult> ExtensionHelper::UpdateExtensions(DatabaseInstance
+ 
+ 	auto &config = DBConfig::GetConfig(db);
+ 
+-#ifndef WASM_LOADABLE_EXTENSIONS
+ 	case_insensitive_set_t seen_extensions;
+ 
+ 	// scan the install directory for installed extensions
+@@ -319,7 +318,6 @@ vector<ExtensionUpdateResult> ExtensionHelper::UpdateExtensions(DatabaseInstance
+ 
+ 		result.push_back(UpdateExtensionInternal(db, fs, fs.JoinPath(ext_directory, path), extension_name));
+ 	});
+-#endif
  
 +#ifndef DUCKDB_FROM_DUCKDB_WASM
  	// union
