@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
 
 #
-# This script is used for rebuild a wasm target (duckdb-wasm-ep) only. 
+# This script is used for rebuild single wasm feature (duckdb-wasm-eh) only. 
 # So please build this project completely with a stable internet connection 
 # before executed this script.
 # 
@@ -14,16 +15,25 @@ usage() {
   local bin;
   bin="$(basename "${BASH_SOURCE[0]}")";
   echo "";
-  echo "  Usage: $bin [--duckdb] [--datadocs]";
+  echo "  Usage: $bin [--prod] [--duckdb] [...features]";
   echo "";
   echo "  Options:";
   echo "";
   echo "    --duckdb      rebuild duckdb core also";
+  echo '    --prod        build for production `-DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1`';
+  echo "";
+  echo "  Common Commands:";
+  echo "";
+  echo "    $bin               # Build WASM file (eh) for daily development purpose";
+  echo "    $bin --prod all    # Build all WASM files (eh, mvp, coi) for release purpose";
   echo "";
   exit 0;
 }
 removedir() { [ -d "$1" ] && execute rm -r -- "$1"; }
-build_target='eh';
+SECONDS=0;
+build_default_features=( eh );
+build_features=();
+target_wasm_files=();
 build_type='dev';
 rebuild_duckdb=;
 parse_args() {
@@ -31,21 +41,29 @@ parse_args() {
 		arg="$1"; shift;
 		case "$arg" in
 			-h|--help|help) usage;;
+      --prod) build_type='relsize';;        # relperf
 			-dd|--dd|--duckdb) rebuild_duckdb=1;;
+      -*) throw  "Unknown option '$arg'";;
+      all) build_features=( eh mvp coi );;
+      *) build_features+=( "$arg" );
 		esac
 	done
 }
 parse_args "${@}";
-SECONDS=0;
+[ "${#build_features[@]}" == "0" ] && build_features=( "${build_default_features[@]}" );
 
 # change the current directory to the script directory
 pushd "$( dirname -- "${BASH_SOURCE[0]}" )/.." >/dev/null || exit 1;
-[ -n "$rebuild_duckdb" ] && removedir "build/dev/${build_target}/third_party/duckdb/src/duckdb_ep-stamp";
 
-# execute make wasm_dev -j4;
-execute ./scripts/wasm_build_lib.sh "$build_type" "$build_target";
-cd packages/duckdb-wasm || exit 1;
-# execute yarn run build:release;
-ls -alh "src/bindings/duckdb-$build_target.wasm";
+# export ENABLE_DATADOCS_EXTENSION=OFF;
+for build_feature in "${build_features[@]}"; do
+  [ -n "$rebuild_duckdb" ] && 
+  removedir "build/dev/${build_feature}/third_party/duckdb/src/duckdb_ep-stamp";
 
+  # execute make wasm_dev -j4;
+  execute ./scripts/wasm_build_lib.sh "$build_type" "$build_feature";
+  target_wasm_files+=( "packages/duckdb-wasm/src/bindings/duckdb-$build_feature.wasm" );
+done
+
+ls -alh "${target_wasm_files[@]}";
 echo "done: +${SECONDS}s"
