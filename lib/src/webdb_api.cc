@@ -255,8 +255,15 @@ void duckdb_web_get_tablenames_buffer(WASMResponse* packed, ConnectionHdl connHd
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
     std::string_view query(reinterpret_cast<const char*>(buffer), buffer_length);
     auto r = c->GetTableNames(query);
+}
+
+/// Get Ingest Schema for a file
+void duckdb_web_ingest_get_schema(WASMResponse* packed, ConnectionHdl connHdl, const char* fileName, const char* path) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    auto r = c->IngestGetSchema(fileName, path);
     WASMResponseBuffer::Get().Store(*packed, std::move(r));
 }
+
 /// Insert arrow from an ipc stream
 void duckdb_web_insert_arrow_from_ipc_stream(WASMResponse* packed, ConnectionHdl connHdl, const uint8_t* buffer,
                                              size_t buffer_length, const char* options) {

@@ -65,6 +65,7 @@
 #include "duckdb/web/udf.h"
 #include "duckdb/web/utils/debug.h"
 #include "duckdb/web/utils/wasm_response.h"
+#include "ingest_schema.hpp"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/rapidjson.h"
@@ -287,6 +288,17 @@ arrow::Result<std::string> WebDB::Connection::GetTableNames(std::string_view tex
         rapidjson::Writer<rapidjson::StringBuffer> writer{strbuf};
         doc.Accept(writer);
         return strbuf.GetString();
+    } catch (std::exception& e) {
+        return arrow::Status{arrow::StatusCode::ExecutionError, e.what()};
+    }
+}
+
+/// Fetch table names
+arrow::Result<std::string> WebDB::Connection::IngestGetSchema(std::string_view fileName, std::string_view path) {
+    try {
+        rapidjson::Document doc;
+        auto file_schema = ingest_get_schema(connection_, std::string{fileName}, std::string(path));
+        return file_schema;
     } catch (std::exception& e) {
         return arrow::Status{arrow::StatusCode::ExecutionError, e.what()};
     }

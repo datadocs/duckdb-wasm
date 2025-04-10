@@ -42,8 +42,8 @@ export class AsyncDuckDBConnection {
         });
         const buffer = await this._bindings.runQuery(this._conn, text);
         const reader = arrow.RecordBatchReader.from<T>(buffer);
-        console.assert(reader.isSync(), "Reader is not sync");
-        console.assert(reader.isFile(), "Reader is not file");
+        console.assert(reader.isSync(), 'Reader is not sync');
+        console.assert(reader.isFile(), 'Reader is not file');
         return new arrow.Table(reader as arrow.RecordBatchFileReader);
     }
 
@@ -79,6 +79,11 @@ export class AsyncDuckDBConnection {
     /** Get table names */
     public async getTableNames(query: string): Promise<string[]> {
         return await this._bindings.getTableNames(this._conn, query);
+    }
+
+    /** Get ingest schema for file */
+    public async ingestGetSchema(query: string, path: string): Promise<string> {
+        return await this._bindings.ingestGetSchema(this._conn, query, path);
     }
 
     /** Create a prepared statement */
