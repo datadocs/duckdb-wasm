@@ -221,6 +221,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                     return;
                 }
                 break;
+            case WorkerRequestType.INGEST_GET_SCHEMA:
+                if (response.type == WorkerResponseType.INGEST_SCHEMA) {
+                    task.promiseResolver(response.data);
+                    return;
+                }
+                break;
             case WorkerRequestType.TOKENIZE:
                 if (response.type == WorkerResponseType.SCRIPT_TOKENS) {
                     task.promiseResolver(response.data);
@@ -460,6 +466,15 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         const task = new WorkerTask<WorkerRequestType.GET_TABLE_NAMES, [number, string], string[]>(
             WorkerRequestType.GET_TABLE_NAMES,
             [conn, text],
+        );
+        return await this.postTask(task);
+    }
+
+    /** Get Ingest Schema for file */
+    public async ingestGetSchema(conn: number, fileName: string, path: string): Promise<string> {
+        const task = new WorkerTask<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string], string>(
+            WorkerRequestType.INGEST_GET_SCHEMA,
+            [conn, fileName, path],
         );
         return await this.postTask(task);
     }

@@ -330,6 +330,19 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     );
                     break;
                 }
+                case WorkerRequestType.INGEST_GET_SCHEMA: {
+                    const result = this._bindings.ingestGetSchema(request.data[0], request.data[1], request.data[2]);
+                    this.postMessage(
+                        {
+                            messageId: this._nextMessageId++,
+                            requestId: request.messageId,
+                            type: WorkerResponseType.INGEST_SCHEMA,
+                            data: result,
+                        },
+                        [],
+                    );
+                    break;
+                }
                 case WorkerRequestType.GLOB_FILE_INFOS: {
                     const infos = this._bindings.globFiles(request.data);
                     this.postMessage(

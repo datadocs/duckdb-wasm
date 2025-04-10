@@ -46,6 +46,7 @@ export enum WorkerRequestType {
     SEND_PREPARED = 'SEND_PREPARED',
     START_PENDING_QUERY = 'START_PENDING_QUERY',
     TOKENIZE = 'TOKENIZE',
+    INGEST_GET_SCHEMA = 'INGEST_GET_SCHEMA',
 }
 
 export enum WorkerResponseType {
@@ -71,6 +72,7 @@ export enum WorkerResponseType {
     SUCCESS = 'SUCCESS',
     TABLE_NAMES = 'TABLE_NAMES',
     VERSION_STRING = 'VERSION_STRING',
+    INGEST_SCHEMA = 'INGEST_SCHEMA',
 }
 
 export type WorkerRequest<T, P> = {
@@ -124,6 +126,7 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.FLUSH_FILES, null>
     | WorkerRequest<WorkerRequestType.GET_FEATURE_FLAGS, null>
     | WorkerRequest<WorkerRequestType.GET_TABLE_NAMES, [number, string]>
+    | WorkerRequest<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string]>
     | WorkerRequest<WorkerRequestType.GET_VERSION, null>
     | WorkerRequest<WorkerRequestType.GLOB_FILE_INFOS, string>
     | WorkerRequest<
@@ -147,10 +150,8 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.TOKENIZE, string>;
 
 export type WorkerResponseTypeVariant = WorkerResponseVariant['type'];
-export type WorkerResponseDataType<
-    ResponseType extends WorkerResponseTypeVariant,
-    Variant = WorkerResponseVariant,
-> = Variant extends WorkerResponse<ResponseType, infer DataType> ? DataType : never;
+export type WorkerResponseDataType<ResponseType extends WorkerResponseTypeVariant, Variant = WorkerResponseVariant> =
+    Variant extends WorkerResponse<ResponseType, infer DataType> ? DataType : never;
 
 export type WorkerResponseVariant =
     | WorkerResponse<WorkerResponseType.CONNECTION_INFO, number>
@@ -173,6 +174,7 @@ export type WorkerResponseVariant =
     | WorkerResponse<WorkerResponseType.SCRIPT_TOKENS, ScriptTokens>
     | WorkerResponse<WorkerResponseType.SUCCESS, boolean>
     | WorkerResponse<WorkerResponseType.TABLE_NAMES, string[]>
+    | WorkerResponse<WorkerResponseType.INGEST_SCHEMA, string>
     | WorkerResponse<WorkerResponseType.VERSION_STRING, string>;
 
 export type WorkerTaskVariant =
@@ -192,6 +194,7 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.FLUSH_FILES, null, null>
     | WorkerTask<WorkerRequestType.GET_FEATURE_FLAGS, null, number>
     | WorkerTask<WorkerRequestType.GET_TABLE_NAMES, [number, string], string[]>
+    | WorkerTask<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string], string>
     | WorkerTask<WorkerRequestType.GET_VERSION, null, string>
     | WorkerTask<
           WorkerRequestType.INSERT_ARROW_FROM_IPC_STREAM,

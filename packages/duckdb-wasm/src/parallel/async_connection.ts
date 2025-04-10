@@ -81,6 +81,11 @@ export class AsyncDuckDBConnection {
         return await this._bindings.getTableNames(this._conn, query);
     }
 
+    /** Get ingest schema for file */
+    public async ingestGetSchema(query: string, path: string): Promise<string> {
+        return await this._bindings.ingestGetSchema(this._conn, query, path);
+    }
+
     /** Create a prepared statement */
     public async prepare<T extends { [key: string]: arrow.DataType } = any>(
         text: string,

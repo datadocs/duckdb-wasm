@@ -283,6 +283,16 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         dropResponseBuffers(this.mod);
         return JSON.parse(res) as string[];
     }
+    /** Get Ingest Schema for a file */
+    public ingestGetSchema(conn: number, fileName: string, path: string): string {
+        const [s, d, n] = callSRet(this.mod, 'duckdb_web_ingest_get_schema', ['number', 'string', 'string'], [conn, fileName, path]);
+        if (s !== StatusCode.SUCCESS) {
+            throw new Error(readString(this.mod, d, n));
+        }
+        const res = readString(this.mod, d, n);
+        dropResponseBuffers(this.mod);
+        return res as string;
+    }
 
     /** Create a scalar function */
     public createScalarFunction(

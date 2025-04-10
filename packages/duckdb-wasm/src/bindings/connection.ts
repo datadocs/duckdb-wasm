@@ -73,6 +73,11 @@ export class DuckDBConnection {
         return this._bindings.getTableNames(this._conn, query);
     }
 
+    /** Ingest get schema for file */
+    public ingestGetSchema(fileName: string, path: string): string {
+        return this._bindings.ingestGetSchema(this._conn, fileName, path);
+    }
+
     /** Create a prepared statement */
     public prepare<T extends { [key: string]: arrow.DataType } = any>(text: string): PreparedStatement {
         const stmt = this._bindings.createPrepared(this._conn, text);
