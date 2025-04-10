@@ -21,6 +21,7 @@ usage() {
   echo "";
   echo "    --duckdb      rebuild duckdb core also";
   echo '    --release     build for release `-DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1`';
+  echo '    --skip-js     skip bundling js files in duckdb-wasm'
   echo "";
   echo "  Common Commands:";
   echo "";
@@ -36,12 +37,14 @@ build_features=();
 target_wasm_files=();
 build_type='dev';
 rebuild_duckdb=;
+skip_js_bundle=;
 parse_args() {
 	while [ "${#@}" -gt 0 ]; do
 		arg="$1"; shift;
 		case "$arg" in
 			-h|--help|help) usage;;
       --release) build_type='relsize';;     # relperf
+			--skip-js) skip_js_bundle=1;;
 			-dd|--dd|--duckdb) rebuild_duckdb=1;;
       -*) throw  "Unknown option '$arg'";;
       all) build_features=( eh mvp coi );;
@@ -78,10 +81,12 @@ for build_feature in "${build_features[@]}"; do
   target_wasm_files+=( "packages/duckdb-wasm/src/bindings/duckdb-$build_feature.wasm" );
 done
 
+if [ -z "$skip_js_bundle" ]; then
 pushd -- packages/duckdb-wasm >/dev/null || exit 1;
 execute pwd;
 execute yarn run build:release; 
 popd >/dev/null || exit 1;
+fi
 
 #endregion core
 
