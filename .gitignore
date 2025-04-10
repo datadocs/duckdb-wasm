@@ -4,6 +4,7 @@
 
 # log files
 /*.log
+/scripts/logs
 
 # MacOS system files
 ._*

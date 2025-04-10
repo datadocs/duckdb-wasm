@@ -1,14 +1,16 @@
 # RAPIDLY BUILDING DUCKDB-WASM
 
-Updated at: 2023-11-07
+Updated at: 2025-04-11
 
 The building manual in this section is only for Ubuntu and Mac OS.
 Feel free to ask [me](https://github.com/hangxingliu) in the Slack if you encounter any
 problems during the build
 
+
+
 ## Prerequisites
 
-``` bash
+```bash
 # ===============
 # Ubuntu:
 sudo apt update && sudo apt install -y build-essential cmake git ccache;
@@ -22,14 +24,48 @@ cd emsdk
 ./emsdk install latest
 ./emsdk activate latest
 source ./emsdk_env.sh
+# ===============
+# Enable `yarn` for Node.js environment that was installed by NVM (Node Version Manager):
+corepack enable
 ```
+
+> [!CAUTION]
+> If the `latest` version of emsdk failed to compile the duckdb-wasm (reporting errors).
+> You could install and activate `3.x` version of emsdk and try again.
+> For example:
+>
+> ```bash
+> emsdk install 3.1.74
+> emsdk activate 3.1.74
+> ```
+
+
 
 ## First Build
 
-``` bash
+```bash
 git clone https://github.com/datadocs/duckdb-wasm.git
 cd duckdb-wasm
 git submodule update --init --depth=1
+```
+
+> [!TIP]
+>
+> #### Pre-download dependencies to speed up the build 
+>
+> This optional step could speed the build and avoid network requests during the build
+>
+> 1. Create the directory [submodules/duckdb/downloaded](submodules/duckdb/downloaded)
+> 2. Download the following files into the directory:
+>     1. `expat-2.2.10.tar.gz`: <https://github.com/libexpat/libexpat/releases/download/R_2_2_10/expat-2.2.10.tar.gz>
+>     2. `icu4c-64_2-src.tgz`: <https://github.com/unicode-org/icu/releases/download/release-64-2/icu4c-64_2-src.tgz>
+>     3. `libboost-includes-master.zip`: <https://github.com/panda-34/libboost-includes/archive/refs/heads/master.zip>
+>     4. `zlib-1.2.11.zip`: https://github.com/madler/zlib/archive/refs/tags/v1.2.11.zip
+> 3. Download the `wasm-pack` or `wasm-pack.exe` from <https://github.com/rustwasm/wasm-pack/releases/tag/v0.12.1> and put the file to the directory [packages/wasm-pack](packages/wasm-pack)
+
+> 
+
+```bash
 yarn install # OR npm install
 source /path/to/your/emsdk/emsdk_env.sh # REMEMBER to replace the path here
 ./scripts/datadocs_fast_rebuild.sh all
@@ -46,30 +82,43 @@ source /path/to/your/emsdk/emsdk_env.sh # REMEMBER to replace the path here
 # - *.yarnpkg.com
 ```
 
+
+
 ## Subsequent Builds
 
-``` bash
+```bash
 ./scripts/datadocs_fast_rebuild.sh
 ```
 
+
+
 ## Build for Release
 
-``` bash
+```bash
 ./scripts/datadocs_fast_rebuild.sh --release all
 # You can take a break after executing this command, because it can take a long time
 ```
 
+
+
 ## Build and Run DuckDB Web Shell
 
-``` bash
+```bash
 # please make sure you have run `yarn install` before
 yarn workspace @duckdb/duckdb-wasm-shell build:debug && yarn workspace @duckdb/duckdb-wasm-app start
 ```
+
+
 
 ## More Tips
 
 You can mount a RAMDISK at `/path/to/your/duckdb-wasm/build` to improve the building process.
 The minimum size of this RAMDISK is **4GB**, the recommanded size of it is **8GB** (Becuase you may need to build for release and dev)
+
+---
+
+
+
 
 
 # BUILDING DUCKDB-WASM ON GCP

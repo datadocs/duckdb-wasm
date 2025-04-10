@@ -17,55 +17,67 @@ usage() {
 
 init() {
 BASE_DIR=..
-[ "$fast_sync" == "1" ] &&
-RSYNC_FILES=( lib packages scripts ) ||
-RSYNC_FILES=(
-	"data"
-	"lib" # c++ source code
-	"misc"
-	"packages"
-	"scripts"
-	"submodules"
-	"tools"
+	[ "$fast_sync" == "1" ] &&
+	# fast sync
+	RSYNC_FILES=( 
+		lib 
+		patches 
+		packages 
+		scripts
+	) ||
+	# normal sync
+	RSYNC_FILES=(
+		"data"
+		"lib" # c++ source code
+		"misc"
+		"packages"
+		"patches"
+		"scripts"
+		"submodules"
+		"tools"
 
-	"Makefile"
-	
-	"package.json"
-	"tsconfig.json"
-	"yarn.lock"
+		"Cargo.lock"
+		"Cargo.toml"
+		"docker-compose.yml"
+		"extension_config_wasm.cmake"
+		"fix.patch"
+		"Makefile"
+		"package.json"
+		README.md
+		"tsconfig.json"
 
-	"duckdb.patch"
-	"fix.patch"
+		"yarn.lock"
+	);
+	RSYNC_EXCLUDE=(
+		'node_modules'
+		'examples/*-node'
+		'packages/*/dist'
+		'packages/*/docs'
+		'packages/duckdb-wasm/src/bindings/duckdb*.js'
+		'packages/duckdb-wasm/src/bindings/duckdb*.wasm'
+		'packages/benchmarks'
+		# 'packages/duckdb-wasm-*'
+		# 'packages/react-duckdb'
+	);
+	RSYNC_OPTIONS=(
+		-a
+		# --xattrs
+		--progress
+		--iconv=utf-8
+		# --delete
+		# --dry-run
 
-	"Cargo.lock"
-	"Cargo.toml"
-)
-RSYNC_OPTIONS=(
-	-a
-	# --xattrs
-	--progress
-	--iconv=utf-8
-	# --delete
-	# --dry-run
-
-	--exclude='._*'
-	--exclude='.DS_Store'
-	--exclude='.github'
-
-	--exclude='node_modules'
-	--exclude='examples/*-node'
-	--exclude='packages/*/dist'
-	--exclude='packages/*/docs'
-	--exclude='packages/duckdb-wasm/src/bindings/duckdb*.js'
-	--exclude='packages/duckdb-wasm/src/bindings/duckdb*.wasm'
-	--exclude='packages/benchmarks'
-	# --exclude='packages/duckdb-wasm-*'
-	# --exclude='packages/react-duckdb'
-
-	# for remote rsync installed by brew
-	# --rsync-path=/usr/local/opt/rsync/bin/rsync
-);
-# the end of init()
+		--exclude='._*'
+		--exclude='.DS_Store'
+		--exclude='.github'
+		
+		# for remote rsync installed by brew
+		# --rsync-path=/usr/local/opt/rsync/bin/rsync
+	);
+	for glob in "${RSYNC_EXCLUDE[@]}"; do
+		RSYNC_OPTIONS+=( --exclude="$glob" );
+	done
+	# the end of init()
 }
 
 
