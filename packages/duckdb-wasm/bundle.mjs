@@ -46,16 +46,46 @@ const EXTERNALS_TEST_BROWSER = ['module'];
 
 // Read CLI flags
 let is_debug = false;
+let enable_blocking = true;
+let enable_coi = true;
+let enable_tests = true;
 let args = process.argv.slice(2);
 if (args.length == 0) {
-    console.warn('Usage: node bundle.mjs {debug/release}');
+    console.warn('Usage: node bundle.mjs [options] {debug/release}');
 } else {
-    if (args[0] == 'debug') is_debug = true;
+    for (const arg of args) {
+        if (arg === '--no-blocking') enable_blocking = false;
+        else if (arg === '--no-coi') enable_coi = false;
+        else if (arg === '--no-tests') enable_tests = false;
+        else if (arg === 'debug') is_debug = true;
+        else if (arg === 'release') is_debug = false;
+        else throw Error(`Unknown arg "${arg}"`);
+    }
 }
-console.log(`DEBUG=${is_debug}`);
+
 function printErr(err) {
     if (err) return console.log(err);
 }
+
+//#region datadocs patches
+const global_define = { 'process.env.KEEP_DEBUG_LOGS': is_debug ? "'1'" : "''" };
+console.log(`DEBUG=${is_debug}`);
+
+/**
+ * Use this function to reduce git conflicts while sync with the upstream
+ * @param {boolean} cond
+ * @returns {typeof esbuild.build}
+ */
+const esbuildIf = cond => (cond ? (...args) => esbuild.build(...args) : () => Promise.resolve());
+const safePatchFile = (fileName, moduleName) => {
+    try {
+        patchFile(fileName, moduleName);
+    } catch (error) {
+        console.warn(`Failed to patch the module "${moduleName}" in "${fileName}":`);
+        console.warn(error.stack);
+    }
+};
+//#endregion datadocs patches
 
 // Patch broken arrow package.json
 // XXX Remove this hack as soon as arrow fixes the exports
@@ -81,14 +111,14 @@ patch_arrow();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(__dirname, 'dist');
 mkdir.sync(dist);
-rimrafSync(`${dist}/*.wasm`);
-rimrafSync(`${dist}/*.d.ts`);
-rimrafSync(`${dist}/*.js`);
-rimrafSync(`${dist}/*.js.map`);
-rimrafSync(`${dist}/*.mjs`);
-rimrafSync(`${dist}/*.mjs.map`);
-rimrafSync(`${dist}/*.cjs`);
-rimrafSync(`${dist}/*.cjs.map`);
+rimrafSync(`${dist}/*.wasm`, { glob: true });
+rimrafSync(`${dist}/*.d.ts`, { glob: true });
+rimrafSync(`${dist}/*.js`, { glob: true });
+rimrafSync(`${dist}/*.js.map`, { glob: true });
+rimrafSync(`${dist}/*.mjs`, { glob: true });
+rimrafSync(`${dist}/*.mjs.map`, { glob: true });
+rimrafSync(`${dist}/*.cjs`, { glob: true });
+rimrafSync(`${dist}/*.cjs.map`, { glob: true });
 
 // -------------------------------
 // Copy WASM files
@@ -101,10 +131,10 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
 (async () => {
     // Don't attempt to bundle NodeJS modules in the browser build.
     console.log('[ ESBUILD ] Patch bindings');
-    patchFile('./src/bindings/duckdb-mvp.js', 'child_process');
-    patchFile('./src/bindings/duckdb-eh.js', 'child_process');
-    patchFile('./src/bindings/duckdb-coi.js', 'child_process');
-    patchFile('./src/bindings/duckdb-coi.pthread.js', 'vm');
+    safePatchFile('./src/bindings/duckdb-mvp.js', 'child_process');
+    safePatchFile('./src/bindings/duckdb-eh.js', 'child_process');
+    safePatchFile('./src/bindings/duckdb-coi.js', 'child_process');
+    safePatchFile('./src/bindings/duckdb-coi.pthread.js', 'vm');
 
     // -------------------------------
     // Browser bundles
@@ -120,7 +150,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser.mjs');
@@ -135,11 +165,11 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser-blocking.cjs');
-    await esbuild.build({
+    await esbuildIf(enable_blocking)({
         entryPoints: ['./src/targets/duckdb-browser-blocking.ts'],
         outfile: 'dist/duckdb-browser-blocking.cjs',
         platform: 'browser',
@@ -150,13 +180,14 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
         define: {
+            ...global_define,
             'process.release.name': '"browser"',
             'process.env.NODE_ENV': '"production"',
         },
     });
 
     console.log('[ ESBUILD ] duckdb-browser-blocking.mjs');
-    await esbuild.build({
+    await esbuildIf(enable_blocking)({
         entryPoints: ['./src/targets/duckdb-browser-blocking.ts'],
         outfile: 'dist/duckdb-browser-blocking.mjs',
         platform: 'browser',
@@ -167,6 +198,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_BROWSER,
         define: {
+            ...global_define,
             'process.release.name': '"browser"',
             'process.env.NODE_ENV': '"production"',
         },
@@ -184,7 +216,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser-eh.worker.js');
@@ -199,11 +231,11 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser-coi.worker.js');
-    await esbuild.build({
+    await esbuildIf(enable_coi)({
         entryPoints: ['./src/targets/duckdb-browser-coi.worker.ts'],
         outfile: 'dist/duckdb-browser-coi.worker.js',
         platform: 'browser',
@@ -214,11 +246,11 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     console.log('[ ESBUILD ] duckdb-browser-coi.pthread.worker.js');
-    await esbuild.build({
+    await esbuildIf(enable_coi)({
         entryPoints: ['./src/targets/duckdb-browser-coi.pthread.worker.ts'],
         outfile: 'dist/duckdb-browser-coi.pthread.worker.js',
         platform: 'browser',
@@ -228,7 +260,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         minify: !is_debug,
         sourcemap: is_debug ? 'inline' : true,
         external: EXTERNALS_WEBWORKER,
-        define: { 'process.release.name': '"browser"' },
+        define: { ...global_define, 'process.release.name': '"browser"' },
     });
 
     // -------------------------------
@@ -249,7 +281,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
     });
 
     console.log('[ ESBUILD ] duckdb-node-blocking.cjs');
-    await esbuild.build({
+    await esbuildIf(enable_blocking)({
         entryPoints: ['./src/targets/duckdb-node-blocking.ts'],
         outfile: 'dist/duckdb-node-blocking.cjs',
         platform: 'node',
@@ -291,7 +323,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
     // Test bundles
 
     console.log('[ ESBUILD ] tests-browser.js');
-    await esbuild.build({
+    await esbuildIf(enable_tests)({
         entryPoints: ['./test/index_browser.ts'],
         outfile: 'dist/tests-browser.js',
         platform: 'browser',
@@ -304,7 +336,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
     });
 
     console.log('[ ESBUILD ] tests-node.cjs');
-    await esbuild.build({
+    await esbuildIf(enable_tests)({
         entryPoints: ['./test/index_node.ts'],
         outfile: 'dist/tests-node.cjs',
         platform: 'node',
@@ -356,6 +388,8 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         await fs.promises.writeFile(filePath, replaced, 'utf-8');
         console.log(`Patched ${file}`);
     }
+
+    console.log('[ ESBUILD ] bundle.mjs done');
 })();
 
 function patchFile(fileName, moduleName) {
