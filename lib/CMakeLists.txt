@@ -115,11 +115,20 @@ if(EMSCRIPTEN)
   # Bump stack size from default 64KB to 1MB
   set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sSTACK_SIZE=1048576")
   
+
+  # region resolve the lowest optimization for current build type
   if(ENABLE_EMSCRIPTEN_ASYNCIFY)
-    set(DEFAULT_WASM_OPTIMIZATION_OPT "-O3")
+    # It’s very important to optimize (-O3 here) when using Asyncify, as unoptimized builds are very large.
+    # https://emscripten.org/docs/porting/asyncify.html
+    set(LOWEST_WASM_OPTIMIZATION "-O3")
+  elseif(ENABLE_DATADOCS_EXTENSION)
+    # The lowest optimization is -O2 for DuckDB with Datadocs extension. Otherwise,
+    # The WASM instance might throw "memory access out of bounds" error
+    set(LOWEST_WASM_OPTIMIZATION "-O2")
   else()
-    set(DEFAULT_WASM_OPTIMIZATION_OPT "-O0")
+    set(LOWEST_WASM_OPTIMIZATION "-O0")
   endif()
+  # endregion
 
   # Release build
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -137,7 +146,7 @@ if(EMSCRIPTEN)
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     # ... with fast linking
     if(WASM_FAST_LINKING)
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${LOWEST_WASM_OPTIMIZATION}")
     endif()
   # Debug build
   elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -148,7 +157,7 @@ if(EMSCRIPTEN)
       -g")
     # ... with fast linking
     if(WASM_FAST_LINKING)
-      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${DEFAULT_WASM_OPTIMIZATION_OPT}")
+      set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} ${LOWEST_WASM_OPTIMIZATION}")
     endif()
   endif()
 
