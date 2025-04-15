@@ -128,11 +128,17 @@ done
 # 3. build javascript files:
 #
 if [ -z "$skip_js_bundle" ]; then
-pushd -- packages/duckdb-wasm >/dev/null || exit 1;
-execute pwd;
-export KEEP_DEBUG_LOGS=1;
-execute yarn run build:release; 
-popd >/dev/null || exit 1;
+  pushd -- packages/duckdb-wasm >/dev/null || exit 1;
+  execute pwd;
+  export KEEP_DEBUG_LOGS=1;
+
+  if ! command -v yarn && command -v corepack; then
+    echo 'Warning: `yarn` is not found. trying to enable it from `corepack`';
+    execute corepack enable;
+  fi
+
+  execute yarn run build:release; 
+  popd >/dev/null || exit 1;
 fi
 
 #endregion core
