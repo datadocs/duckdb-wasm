@@ -115,6 +115,13 @@ yarn workspace @duckdb/duckdb-wasm-shell build:debug && yarn workspace @duckdb/d
 You can mount a RAMDISK at `/path/to/your/duckdb-wasm/build` to improve the building process.
 The minimum size of this RAMDISK is **4GB**, the recommanded size of it is **8GB** (Becuase you may need to build for release and dev)
 
+
+## SOP for Releasing New Version
+
+```bash
+./scripts/datadocs_fast_rebuild.sh --release all
+```
+
 ---
 
 
