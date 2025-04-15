@@ -1,0 +1,5 @@
+node_modules
+
+# pre-downloaded wasm-pack files
+/wasm-pack-*
+/wasm-pack
