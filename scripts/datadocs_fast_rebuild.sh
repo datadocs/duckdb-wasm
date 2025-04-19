@@ -10,7 +10,7 @@
 # Usage:   datadocs_fast_rebuild.sh [--release] [--duckdb] [...features]
 # Options: please read the `usage` function below for details
 # Author:  Liu Yue @hangxingliu
-# Version: 2025-04-11
+# Version: 2025-04-19
 #
 throw() { echo -e "fatal: $1" >&2; exit 1; }
 execute() { echo "$ $*"; "$@" || throw "Failed to execute '$1'"; }
@@ -98,7 +98,7 @@ execute touch .ccache/extension/datadocs;
 #
 execute make apply_patches
 print_cmd bash scripts/datadocs_clean_files.sh
-bash scripts/datadocs_clean_files.sh >/dev/null;
+bash scripts/datadocs_clean_files.sh >> "${log_file}";
 
 #
 # 2. build each features:

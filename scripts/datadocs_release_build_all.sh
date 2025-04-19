@@ -1,19 +1,26 @@
 #!/usr/bin/env bash
 
 #
-# WIP ...
+# Description:
 #
-
-# 1. build eh + mvp + coi (relperf)
-# 2. build `duckdb-wasm` package
-# 3. release to github package registery
+#   A bash script used to build all DuckDB WASM files and JavaScript files 
+#   before publishing the `duckdb-wasm` package to npm registry.
+# 
+#   CAVEAT: This script takes a long time to execute, it will build three different WASM variants:
+#           MVP, EH and COI. So you can run this script and then go do something else.
+#
+#           Moreover, this script script is not deisgned for daily development. Please use
+#           the script `datadocs_fast_rebuild.sh` if you want to quickly rebuild your changes.
+# 
+# Usage:   datadocs_release_build_all.sh
+# Author:  Liu Yue @hangxingliu
+# Version: 2025-04-19
+#
 
 # https://github.com/duckdb/duckdb-wasm/blob/main/.github/workflows/main.yml
 # $ emsdk list
 EMSDK_VERSION=3.1.74;
 EMSDK_VERSION_COI=3.1.57;
-
-
 
 #
 # ================================
@@ -35,14 +42,23 @@ fi
 pushd "$( dirname -- "${BASH_SOURCE[0]}" )/.." >/dev/null || exit 1;
 
 command -v emsdk >/dev/null || throw "emsdk is not installed!";
+command -v yarn  >/dev/null || throw "yarn is not installed!";
 
+SECONDS=0;
+
+execute yarn install;
+
+# Keep downloaded emsdk archive file to avoid re-download them again
 execute export EMSDK_KEEP_DOWNLOADS=1;
 
 execute emsdk install "$EMSDK_VERSION";
 execute emsdk activate "$EMSDK_VERSION";
-execute bash ./scripts/datadocs_fast_rebuild.sh --release eh mvp;
+execute bash ./scripts/datadocs_fast_rebuild.sh --release --duckdb --skip-js eh mvp;
 
 execute emsdk install "$EMSDK_VERSION_COI";
 execute emsdk activate "$EMSDK_VERSION_COI";
-execute bash ./scripts/datadocs_fast_rebuild.sh --release coi;
+execute bash ./scripts/datadocs_fast_rebuild.sh --release --duckdb coi;
 
+execute bash ./scripts/datadocs_generate_git_log.sh;
+
+echo "all done: +${SECONDS}s ($0)"
