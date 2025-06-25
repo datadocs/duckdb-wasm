@@ -5,6 +5,8 @@
 # log files
 /*.log
 /scripts/logs
+/logs
+/git-diff-logs
 
 # MacOS system files
 ._*

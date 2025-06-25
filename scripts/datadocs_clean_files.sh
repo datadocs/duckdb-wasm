@@ -8,10 +8,12 @@
 #
 # Usage:   datadocs_clean_files.sh [--reset|--force]
 # Author:  Liu Yue @hangxingliu
-# Version: 2025-04-19
+# Version: 2025-06-25
+#
 git_sub_modules=(
 	submodules/duckdb
 	submodules/arrow
+	submodules/rapidjson
 );
 
 
@@ -23,11 +25,12 @@ usage() {
   echo "";
   exit 0;
 }
-throw() { echo -e "fatal: $1" >&2; exit 1; }
-print_cmd() { printf "\$ %s\n" "$*"; }
+throw() { printf "${RED}fatal: %s${RESET}\n" "$1" >&2; exit 1; }
+print_cmd() { printf "${CYAN}\$ %s${RESET}\n" "$*"; }
 execute() { print_cmd "$@"; "$@" || throw "Failed to execute '$1'"; }
 execute_silent() { print_cmd "$@"; "$@" >/dev/null || throw "Failed to execute '$1'"; }
 get_stdout() { print_cmd "$@"; get_stdout_result="$("$@")"; }
+RED="\x1b[31m";  CYAN="\x1b[36m";  RESET="\x1b[0m";
 
 git_hard_reset=false;
 has_yes=false;
@@ -62,11 +65,13 @@ for sub_module_dir in "${git_sub_modules[@]}"; do
 
 	execute_silent pushd "$sub_module_dir";
 	if $git_hard_reset; then
-		execute git status --untracked-files=all --short;
-
-		print_cmd git reset --hard HEAD;
-		confirm "all changes in ${sub_module_dir} will be dropped" &&
-			execute git reset --hard HEAD;
+		get_stdout git -c color.status=always status --untracked-files=all --short;
+		if [ -n "$get_stdout_result" ]; then
+			echo "$get_stdout_result";
+			print_cmd git reset --hard HEAD;
+			confirm "all changes in ${sub_module_dir} will be dropped" &&
+				execute git reset --hard HEAD;
+		fi
 	else
 		get_stdout git status --untracked-files=all --short;
 		files="$(echo "$get_stdout_result" | awk '/^\?\?/ && /\.rej$/ {print $2}')";

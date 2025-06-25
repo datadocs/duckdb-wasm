@@ -10,7 +10,7 @@
 # Usage:   datadocs_fast_rebuild.sh [--release] [--duckdb] [...features]
 # Options: please read the `usage` function below for details
 # Author:  Liu Yue @hangxingliu
-# Version: 2025-04-19
+# Version: 2025-06-24
 #
 throw() { echo -e "fatal: $1" >&2; exit 1; }
 execute() { echo "$ $*"; "$@" || throw "Failed to execute '$1'"; }
@@ -33,7 +33,7 @@ usage() {
   echo "";
   exit 0;
 }
-removedir() { [ -d "$1" ] && execute rm -r -- "$1"; }
+removedir() { [ -d "$1" ] && execute rm -r -f -- "$1"; }
 SECONDS=0;
 build_default_features=( eh );
 build_features=();
@@ -105,14 +105,18 @@ bash scripts/datadocs_clean_files.sh >> "${log_file}";
 #
 # export ENABLE_DATADOCS_EXTENSION=OFF;
 for build_feature in "${build_features[@]}"; do
-  [ -n "$rebuild_duckdb" ] && 
-    removedir "build/${build_type}/${build_feature}/third_party/duckdb/src/duckdb_ep-stamp";
+  if [ -n "$rebuild_duckdb" ]; then
+    removedir "build/${build_type}/${build_feature}/third_party/duckdb";
+    removedir "build/${build_type}/${build_feature}/third_party/arrow";
+    removedir "build/${build_type}/${build_feature}/third_party/rapidjson";
+  fi
   target_wasm_files+=( "packages/duckdb-wasm/src/bindings/duckdb-$build_feature.wasm" );
   
   #
   # The core of the building:
   #
   # execute make wasm_dev -j4;
+  execute export DUCKDB_PLATFORM="wasm_$build_feature";
   build_cmd=( bash ./scripts/wasm_build_lib.sh "$build_type" "$build_feature" );
   print_cmd "${build_cmd[@]}" | tee -a "${log_file}";
   "${build_cmd[@]}" 2>&1 | tee -a "${log_file}";
