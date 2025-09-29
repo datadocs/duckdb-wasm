@@ -4,7 +4,7 @@
 ///   and the native environment
 ///
 /// @author Liu Yue @hangxingliu
-/// @version 2024-04-03
+/// @version 2025-09-30
 /// ================================
 /// Example Usage:
 ///
@@ -17,12 +17,12 @@
 /// Then you can search for the prefix '>>> WASM >>>' in the devTools console of your browser
 ///   to filter the log entries
 ///
-#ifdef __EMSCRIPTEN__
+#ifdef EMSCRIPTEN
 #include "emscripten/console.h"
 #endif
 
 #ifndef DEBUG_CONSOLE_LOG_PREFIX
-#ifdef __EMSCRIPTEN__
+#ifdef EMSCRIPTEN
 #define DEBUG_CONSOLE_LOG_PREFIX ">>> WASM >>> "
 #else
 #define DEBUG_CONSOLE_LOG_PREFIX ">>> D7NX >>> "
@@ -33,7 +33,7 @@ inline size_t __debug_console_log_max = 0;
 #endif
 
 #ifndef console_log
-#ifdef __EMSCRIPTEN__
+#ifdef EMSCRIPTEN
 #define _debug_console_log() emscripten_console_log(__debug_console_log_buff);
 #else
 #define _debug_console_log()                                                                                           \

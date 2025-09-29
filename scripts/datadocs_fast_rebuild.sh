@@ -10,7 +10,7 @@
 # Usage:   datadocs_fast_rebuild.sh [--release] [--duckdb] [...features]
 # Options: please read the `usage` function below for details
 # Author:  Liu Yue @hangxingliu
-# Version: 2025-06-24
+# Version: 2025-09-27
 #
 throw() { echo -e "fatal: $1" >&2; exit 1; }
 execute() { echo "$ $*"; "$@" || throw "Failed to execute '$1'"; }
@@ -25,6 +25,7 @@ usage() {
   echo "    --duckdb      rebuild duckdb core also";
   echo '    --release     build for release `-DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1`';
   echo '    --skip-js     skip bundling js files in duckdb-wasm'
+  echo '    --only-js';
   echo "";
   echo "  Common Commands:";
   echo "";
@@ -41,6 +42,7 @@ target_wasm_files=();
 build_type='dev';
 rebuild_duckdb=;
 skip_js_bundle=;
+only_js_bundle=;
 parse_args() {
 	while [ "${#@}" -gt 0 ]; do
 		arg="$1"; shift;
@@ -48,6 +50,7 @@ parse_args() {
 			-h|--help|help) usage;;
       --release) build_type='relperf';;     # relperf
 			--skip-js) skip_js_bundle=1;;
+			--only-js) only_js_bundle=1;;
 			-dd|--dd|--duckdb) rebuild_duckdb=1;;
       -*) throw  "Unknown option '$arg'";;
       all) build_features=( eh mvp coi );;
@@ -104,6 +107,7 @@ bash scripts/datadocs_clean_files.sh >> "${log_file}";
 # 2. build each features:
 #
 # export ENABLE_DATADOCS_EXTENSION=OFF;
+[ -n "$only_js_bundle" ] && build_features=();
 for build_feature in "${build_features[@]}"; do
   if [ -n "$rebuild_duckdb" ]; then
     removedir "build/${build_type}/${build_feature}/third_party/duckdb";
@@ -131,7 +135,7 @@ done
 #
 # 3. build javascript files:
 #
-if [ -z "$skip_js_bundle" ]; then
+if [ -n "$only_js_bundle" ] || [ -z "$skip_js_bundle" ]; then
   pushd -- packages/duckdb-wasm >/dev/null || exit 1;
   execute pwd;
   export KEEP_DEBUG_LOGS=1;

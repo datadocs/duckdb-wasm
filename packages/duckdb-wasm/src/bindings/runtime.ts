@@ -117,7 +117,38 @@ export function callSRet(
     args.unshift(response);
 
     // Do the call
-    mod.ccall(funcName, null, argTypes, args);
+    const ccallResult = mod.ccall(funcName, null, argTypes, args);
+    if (ccallResult && typeof (ccallResult as Promise<unknown>).then === 'function')
+        throw new Error(
+            `The result of mode.ccall("${funcName}") is a promise, please use callSRetAsync to call this WASM function`,
+        );
+
+    // Read the response
+    const status = mod.HEAPF64[(response >> 3) + 0];
+    const data = mod.HEAPF64[(response >> 3) + 1];
+    const dataSize = mod.HEAPF64[(response >> 3) + 2];
+
+    // Restore the stack
+    mod.stackRestore(stackPointer);
+    return [status, data, dataSize];
+}
+
+export async function callSRetAsync(
+    mod: DuckDBModule,
+    funcName: string,
+    argTypes: Array<Emscripten.JSType>,
+    args: Array<any>,
+): Promise<CallSRetResult> {
+    const stackPointer = mod.stackSave();
+
+    // Allocate the packed response buffer
+    const response = mod.stackAlloc(3 * 8);
+    argTypes.unshift('number');
+    args.unshift(response);
+
+    // Do the call
+    const ccallResult = mod.ccall(funcName, null, argTypes, args, { async: true });
+    if (ccallResult) await ccallResult;
 
     // Read the response
     const status = mod.HEAPF64[(response >> 3) + 0];
