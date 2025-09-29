@@ -9,6 +9,7 @@ import {
 } from './worker_request';
 import { Logger, LogEntryVariant } from '../log';
 import { InstantiationProgress } from '../bindings/progress';
+import { getBoundPort } from '../utils/shared_worker.js';
 
 export abstract class AsyncDuckDBDispatcher implements Logger {
     /** The bindings */
@@ -23,7 +24,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
         progress: (p: InstantiationProgress) => void,
     ): Promise<DuckDBBindings>;
     /** Post a response to the main thread */
-    protected abstract postMessage(response: WorkerResponseVariant, transfer: ArrayBuffer[]): void;
+    protected abstract postMessage(response: WorkerResponseVariant, transfer: ArrayBuffer[], port?: MessagePort): void;
 
     /** Send log entry to the main thread */
     public log(entry: LogEntryVariant): void {
@@ -68,6 +69,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                 data: obj,
             },
             [],
+            getBoundPort(request),
         );
         return;
     }
@@ -83,7 +85,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
             type,
             data: data as any,
         };
-        this.postMessage(msg, []);
+        this.postMessage(msg, [], getBoundPort(request));
     }
 
     /** Process a request from the main thread */
@@ -95,7 +97,12 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                 return;
             case WorkerRequestType.INSTANTIATE:
                 if (this._bindings != null) {
-                    this.failWith(request, new Error('duckdb already initialized'));
+                    const sharedWorkerPort = getBoundPort(request);
+                    if (sharedWorkerPort) {
+                        this.sendOK(request);
+                    } else {
+                        this.failWith(request, new Error('duckdb already initialized'));
+                    }
                 }
                 try {
                     this._bindings = await this.instantiate(request.data[0], request.data[1], p => {
@@ -107,6 +114,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                                 data: p,
                             },
                             [],
+                            getBoundPort(request),
                         );
                     });
                     this.sendOK(request);
@@ -137,6 +145,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: this._bindings.getVersion(),
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 case WorkerRequestType.GET_FEATURE_FLAGS:
@@ -148,6 +157,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: this._bindings.getFeatureFlags(),
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 case WorkerRequestType.RESET:
@@ -192,6 +202,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: conn.useUnsafe((_, c) => c),
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -209,6 +220,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -227,6 +239,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [result.buffer],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -240,6 +253,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [result.buffer],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -253,6 +267,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [result.buffer],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -270,6 +285,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         transfer,
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -287,6 +303,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         transfer,
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -300,6 +317,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -314,6 +332,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         transfer,
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -327,6 +346,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -340,6 +360,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -353,6 +374,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: infos,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -392,6 +414,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: buffer,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -414,6 +437,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: this._bindings.exportFileStatistics(request.data),
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }
@@ -442,6 +466,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                             data: result,
                         },
                         [],
+                        getBoundPort(request),
                     );
                     break;
                 }

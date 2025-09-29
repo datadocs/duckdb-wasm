@@ -38,8 +38,8 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** The logger */
     protected readonly _logger: Logger;
-    /** The worker */
-    protected _worker: Worker | null = null;
+    /** The web worker / shared worker */
+    protected _worker: Worker | SharedWorker | null = null;
     /** The promise for the worker shutdown */
     protected _workerShutdownPromise: Promise<null> | null = null;
     /** Make the worker as terminated */
@@ -50,7 +50,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** The pending requests */
     protected _pendingRequests: Map<number, WorkerTaskVariant> = new Map();
 
-    constructor(logger: Logger, worker: Worker | null = null) {
+    constructor(logger: Logger, worker: Worker | SharedWorker | null = null) {
         this._logger = logger;
         this._onMessageHandler = this.onMessage.bind(this);
         this._onErrorHandler = this.onError.bind(this);
@@ -64,11 +64,18 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     }
 
     /** Attach to worker */
-    protected attach(worker: Worker): void {
+    protected attach(worker: Worker | SharedWorker): void {
         this._worker = worker;
-        this._worker.addEventListener('message', this._onMessageHandler);
-        this._worker.addEventListener('error', this._onErrorHandler);
-        this._worker.addEventListener('close', this._onCloseHandler);
+        if ('port' in worker) {
+            worker.port.addEventListener('message', this._onMessageHandler);
+            worker.addEventListener('error', this._onErrorHandler);
+            worker.port.addEventListener('close', this._onCloseHandler);
+            worker.port.start();
+        } else {
+            worker.addEventListener('message', this._onMessageHandler);
+            worker.addEventListener('error', this._onErrorHandler);
+            worker.addEventListener('close', this._onCloseHandler);
+        }
         this._workerShutdownPromise = new Promise<null>(
             (resolve: (value: PromiseLike<null> | null) => void, _reject: (reason?: void) => void) => {
                 this._workerShutdownResolver = resolve;
@@ -78,10 +85,17 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Detach from worker */
     public detach(): void {
-        if (!this._worker) return;
-        this._worker.removeEventListener('message', this._onMessageHandler);
-        this._worker.removeEventListener('error', this._onErrorHandler);
-        this._worker.removeEventListener('close', this._onCloseHandler);
+        const worker = this._worker;
+        if (!worker) return;
+        if ('port' in worker) {
+            worker.port.removeEventListener('message', this._onMessageHandler);
+            worker.removeEventListener('error', this._onErrorHandler);
+            worker.port.removeEventListener('close', this._onCloseHandler);
+        } else {
+            worker.removeEventListener('message', this._onMessageHandler);
+            worker.removeEventListener('error', this._onErrorHandler);
+            worker.removeEventListener('close', this._onCloseHandler);
+        }
         this._worker = null;
         this._workerShutdownResolver(null);
         this._workerShutdownPromise = null;
@@ -90,8 +104,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Kill the worker */
     public async terminate(): Promise<void> {
-        if (!this._worker) return;
-        this._worker.terminate();
+        const worker = this._worker;
+        if (!worker) return;
+        if ('port' in worker) worker.port.close();
+        else worker.terminate();
         //await this._workerShutdownPromise; TODO deadlocking in karma?
         this._worker = null;
         this._workerShutdownPromise = null;
@@ -103,20 +119,20 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         task: W,
         transfer: ArrayBuffer[] = [],
     ): Promise<WorkerTaskReturnType<W>> {
-        if (!this._worker) {
+        const worker = this._worker;
+        if (!worker) {
             console.error('cannot send a message since the worker is not set!');
             return undefined as any;
         }
         const mid = this._nextMessageId++;
         this._pendingRequests.set(mid, task);
-        this._worker.postMessage(
-            {
-                messageId: mid,
-                type: task.type,
-                data: task.data,
-            },
-            transfer,
-        );
+        const message = {
+            messageId: mid,
+            type: task.type,
+            data: task.data,
+        };
+        if ('port' in worker) worker.port.postMessage(message, transfer);
+        else worker.postMessage(message, transfer);
         return (await task.promise) as WorkerTaskReturnType<W>;
     }
 

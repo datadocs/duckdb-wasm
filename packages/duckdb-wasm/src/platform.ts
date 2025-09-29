@@ -59,6 +59,7 @@ export interface DuckDBBundle {
     mainModule: string;
     mainWorker: string | null;
     pthreadWorker: string | null;
+    sharedWorker?: string;
 }
 
 export interface PlatformFeatures {
@@ -121,6 +122,7 @@ export async function selectBundle(bundles: DuckDBBundles): Promise<DuckDBBundle
             return {
                 mainModule: bundles.eh.mainModule,
                 mainWorker: bundles.eh.mainWorker,
+                sharedWorker: bundles.eh.mainWorker,
                 pthreadWorker: null,
             };
         }
