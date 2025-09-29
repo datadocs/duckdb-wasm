@@ -1,5 +1,7 @@
 #include "duckdb/web/io/web_filesystem.h"
 
+#include <emscripten.h>
+
 #include <cstdint>
 #include <iostream>
 #include <mutex>
@@ -15,6 +17,7 @@
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/web/io/glob.h"
 #include "duckdb/web/io/web_filesystem.h"
+#include "duckdb/web/utils/async_result_buffer.h"
 #include "duckdb/web/utils/debug.h"
 #include "duckdb/web/utils/scope_guard.h"
 #include "duckdb/web/utils/thread.h"
@@ -104,6 +107,7 @@ struct OpenedFile {
 #else
 #define RT_FN(FUNC, IMPL) FUNC IMPL;
 #endif
+// clang-format off
 RT_FN(uint32_t duckdb_web_fs_get_default_data_protocol(), { return io::WebFileSystem::DataProtocol::NODE_FS; });
 RT_FN(void *duckdb_web_fs_file_open(size_t file_id, uint8_t flags), {
     auto &file = GetOrOpen(file_id);
@@ -123,7 +127,7 @@ RT_FN(time_t duckdb_web_fs_file_get_last_modified_time(size_t file_id), {
     auto &file = GetOrOpen(file_id);
     return NATIVE_FS->GetLastModifiedTime(file);
 });
-RT_FN(ssize_t duckdb_web_fs_file_read(size_t file_id, void *buffer, ssize_t bytes, double location), {
+RT_FN(ssize_t duckdb_web_fs_file_read(size_t file_id, void *buffer, ssize_t bytes, double location, void *async_result_buf), {
     auto &file = GetOrOpen(file_id);
     auto file_size = file.GetFileSize();
     auto safe_offset = std::min<int64_t>(file_size, location);
@@ -158,6 +162,7 @@ RT_FN(void duckdb_web_fs_file_move(const char *from, size_t fromLen, const char 
 RT_FN(bool duckdb_web_fs_file_exists(const char *path, size_t pathLen), {
     return NATIVE_FS->FileExists(std::string{path, pathLen});
 });
+// clang-format off
 #undef RT_FN
 
 extern "C" void duckdb_web_fs_glob_add_path(const char *path) {
@@ -763,7 +768,18 @@ int64_t WebFileSystem::Read(duckdb::FileHandle &handle, void *buffer, int64_t nr
         case DataProtocol::NODE_FS:
         case DataProtocol::BROWSER_FILEREADER:
         case DataProtocol::BROWSER_FSACCESS: {
-            auto n = duckdb_web_fs_file_read(file.file_id_, buffer, nr_bytes, file_hdl.position_);
+            uint8_t *async_result_buf = PrepareAsyncResultBuffer(sizeof(uint32_t));
+            ssize_t n = duckdb_web_fs_file_read(file.file_id_, buffer, nr_bytes, file_hdl.position_, async_result_buf);
+            if(WaitForAsyncResultBufferReady(async_result_buf)) {
+                n = GetUInt32FromAsyncResultBuffer(async_result_buf);
+            }
+            
+            DestroyAsyncResultBuffer(async_result_buf);
+            console_log("duckdb_web_fs_file_read result: %zu", n);
+
+            std::string sample(static_cast<const char *>(buffer), 32);
+            console_log("duckdb_web_fs_file_read result: %s", sample.c_str());
+
             // Register read
             if (file.file_stats_) {
                 file.file_stats_->RegisterFileReadCold(file_hdl.position_, n);
@@ -778,14 +794,14 @@ int64_t WebFileSystem::Read(duckdb::FileHandle &handle, void *buffer, int64_t nr
         case DataProtocol::S3: {
             if (auto ra = file_hdl.ResolveReadAheadBuffer(file_guard)) {
                 auto reader = [&](auto *out, size_t n, duckdb::idx_t ofs) {
-                    return duckdb_web_fs_file_read(file.file_id_, out, n, ofs);
+                    return duckdb_web_fs_file_read(file.file_id_, out, n, ofs, nullptr);
                 };
                 auto n = ra->Read(file.file_id_, file.file_size_.value_or(0), buffer, nr_bytes, file_hdl.position_,
                                   reader, file.file_stats_.get());
                 file_hdl.position_ += n;
                 return n;
             } else {
-                auto n = duckdb_web_fs_file_read(file.file_id_, buffer, nr_bytes, file_hdl.position_);
+                auto n = duckdb_web_fs_file_read(file.file_id_, buffer, nr_bytes, file_hdl.position_, nullptr);
                 // Register read
                 if (file.file_stats_) {
                     file.file_stats_->RegisterFileReadCold(file_hdl.position_, n);

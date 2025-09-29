@@ -26,8 +26,8 @@ export class DuckDBConnection {
     }
 
     /** Run a query */
-    public query<T extends { [key: string]: arrow.DataType } = any>(text: string): arrow.Table<T> {
-        const buffer = this._bindings.runQuery(this._conn, text);
+    public async query<T extends { [key: string]: arrow.DataType } = any>(text: string): Promise<arrow.Table<T>> {
+        const buffer = await this._bindings.runQuery(this._conn, text);
         const reader = arrow.RecordBatchReader.from<T>(buffer);
         console.assert(reader.isSync());
         console.assert(reader.isFile());

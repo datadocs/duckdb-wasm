@@ -16,6 +16,7 @@ import {
 } from './runtime';
 import { DuckDBModule } from './duckdb_module';
 import * as udf from './udf_runtime';
+import { writePendingByteIntoAsyncTaskResult, writeAsyncTaskUInt32Result } from '../utils/async_task_result.js';
 
 const OPFS_PREFIX_LEN = 'opfs://'.length;
 const PATH_SEP_REGEX = /\/|\\/;
@@ -604,7 +605,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
         }
         return 0;
     },
-    readFile(mod: DuckDBModule, fileId: number, buf: number, bytes: number, location: number) {
+    readFile(mod: DuckDBModule, fileId: number, buf: number, bytes: number, location: number, asyncResultBuf?: number) {
         if (bytes == 0) {
             // Be robust to empty reads
             return 0;
@@ -676,19 +677,24 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                     if (!handle) {
                         throw new Error(`No OPFS access handle registered with name: ${file.fileName}`);
                     }
-                    // const data = new Uint8Array(bytes);
-                    // const num = handle.read(data, { at: location });
-                    // mod.HEAPU8.set(data, buf);
-                    const out = mod.HEAPU8.subarray(buf, buf + bytes);
-                    const num = handle.read(out, { at: location });
-                    // if (logWASMCall) {
-                    //     const header = [out.at(0), out.at(1)]
-                    //         .filter(it => typeof it === 'number')
-                    //         .map(it => it!.toString(16))
-                    //         .join(',');
-                    //     console.log(`[WASM-CALL] handle.read("${file.fileName}", ${location}, ${header})`);
-                    // }
-                    return num;
+                    // the following code simulates an async read from the worker that owns the handler
+                    writePendingByteIntoAsyncTaskResult(mod, asyncResultBuf);
+                    setTimeout(() => {
+                        const out = mod.HEAPU8.subarray(buf, buf + bytes);
+                        const num = handle.read(out, { at: location });
+
+                        let log = `[WASM-CALL] read ${num} bytes at ${location}`;
+                        if (bytes !== num) log += ` (request ${bytes} bytes)`;
+                        try {
+                            const sample = new TextDecoder().decode(out.subarray(0, Math.min(num, 64)));
+                            log += `sample: ` + JSON.stringify(sample);
+                        } catch {
+                            // noop
+                        }
+                        console.log(log);
+                        writeAsyncTaskUInt32Result(mod, asyncResultBuf, num);
+                    }, 30);
+                    return 0;
                 }
             }
             return 0;

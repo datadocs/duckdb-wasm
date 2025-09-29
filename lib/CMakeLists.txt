@@ -25,7 +25,7 @@ set(ignoreMe "${DUCKDB_WASM_VERSION}")
 #    Because an unoptimized builds with Asyncify are very large and 
 #    it can cause a `local count too large` error in the frontend.
 # 
-set(ENABLE_EMSCRIPTEN_ASYNCIFY OFF)
+set(ENABLE_EMSCRIPTEN_ASYNCIFY ON)
 
 option(DUCKDB_WASM_LOADABLE_EXTENSIONS "Build with loadable extensions" OFF)
 
@@ -112,8 +112,13 @@ endif ()
 set(DUCKDB_PLATFORM "wasm_mvp")
 
 if(EMSCRIPTEN)
-  # Bump stack size from default 64KB to 1MB
-  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sSTACK_SIZE=1048576")
+
+  # Bump stack size from default 64KB to 1MB/8MB
+  if(ENABLE_EMSCRIPTEN_ASYNCIFY)
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sSTACK_SIZE=8388608 -sASYNCIFY_STACK_SIZE=32768")
+  else()
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sSTACK_SIZE=1048576")
+  endif()
   
 
   # region resolve the lowest optimization for current build type
@@ -165,8 +170,8 @@ if(EMSCRIPTEN)
     set(DUCKDB_PLATFORM "wasm_eh")
     # The option `-f wasm-exceptions` is not compatible with `-s ASYNCIFY`.
     # So we may need to disable the config in the next line
-    set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -DWEBDB_FAST_EXCEPTIONS=1")
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sDISABLE_EXCEPTION_CATCHING=1")
   endif()
@@ -360,7 +365,8 @@ endif()
 # ---------------------------------------------------------------------------
 # Emscripten
 if(ENABLE_EMSCRIPTEN_ASYNCIFY)
-  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -s ASYNCIFY -s ASYNCIFY_IGNORE_INDIRECT=1")
+  set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -s ASYNCIFY")
+  # -s ASYNCIFY_IGNORE_INDIRECT=1
 endif()
 
 # We need "-s WARN_ON_UNDEFINED_SYMBOLS=0" to instantiate the module with our

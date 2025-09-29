@@ -62,7 +62,7 @@ export enum FileFlags {
     FILE_FLAGS_NULL_IF_NOT_EXISTS = 1 << 7,
     FILE_FLAGS_PARALLEL_ACCESS = 1 << 8,
     FILE_FLAGS_EXCLUSIVE_CREATE = 1 << 9,
-    FILE_FLAGS_NULL_IF_EXISTS = 1 << 10
+    FILE_FLAGS_NULL_IF_EXISTS = 1 << 10,
 }
 
 /** Configuration for the AWS S3 Filesystem */
@@ -181,7 +181,14 @@ export interface DuckDBRuntime {
     dropFile(mod: DuckDBModule, fileNamePtr: number, fileNameLen: number): void;
     getLastFileModificationTime(mod: DuckDBModule, fileId: number): number;
     truncateFile(mod: DuckDBModule, fileId: number, newSize: number): void;
-    readFile(mod: DuckDBModule, fileId: number, buffer: number, bytes: number, location: number): number;
+    readFile(
+        mod: DuckDBModule,
+        fileId: number,
+        buffer: number,
+        bytes: number,
+        location: number,
+        asyncResultBuf?: number,
+    ): number;
     writeFile(mod: DuckDBModule, fileId: number, buffer: number, bytes: number, location: number): number;
 
     // File APIs with path parameter

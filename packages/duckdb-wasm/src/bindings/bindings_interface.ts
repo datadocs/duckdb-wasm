@@ -15,7 +15,7 @@ export interface DuckDBBindings {
 
     connect(): DuckDBConnection;
     disconnect(conn: number): void;
-    runQuery(conn: number, text: string): Uint8Array;
+    runQuery(conn: number, text: string): Promise<Uint8Array>;
     startPendingQuery(conn: number, text: string, allowStreamResult: boolean): Uint8Array | null;
     pollPendingQuery(conn: number): Uint8Array | null;
     cancelPendingQuery(conn: number): boolean;

@@ -5,7 +5,7 @@ import { InstantiationProgress } from './progress';
 import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
 import { StatusCode, IsArrowBuffer, IsDuckDBWasmRetry } from '../status';
-import { dropResponseBuffers, DuckDBRuntime, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
+import { dropResponseBuffers, DuckDBRuntime, readString, callSRet, copyBuffer, DuckDBDataProtocol, callSRetAsync } from './runtime';
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
 import { FileStatistics } from './file_stats';
@@ -175,12 +175,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
 
     /** Send a query and return the full result */
-    public runQuery(conn: number, text: string): Uint8Array {
+    public async runQuery(conn: number, text: string): Promise<Uint8Array> {
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = this.mod._malloc(BUF.length);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
         bufferOfs.set(BUF);
-        const [s, d, n] = callSRet(
+        const [s, d, n] = await callSRetAsync(
             this.mod,
             'duckdb_web_query_run_buffer',
             ['number', 'number', 'number'],
@@ -194,6 +194,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         dropResponseBuffers(this.mod);
         return res;
     }
+    
     /**
      *  Start a pending query asynchronously.
      *  This method returns either the arrow ipc schema or null.

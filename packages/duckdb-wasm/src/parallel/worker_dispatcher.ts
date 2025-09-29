@@ -244,7 +244,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     break;
                 }
                 case WorkerRequestType.RUN_QUERY: {
-                    const result = this._bindings.runQuery(request.data[0], request.data[1]);
+                    const result = await this._bindings.runQuery(request.data[0], request.data[1]);
                     this.postMessage(
                         {
                             messageId: this._nextMessageId++,
