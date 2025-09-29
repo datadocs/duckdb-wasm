@@ -36,13 +36,18 @@ import { execSync } from 'child_process';
 // The lack of alternatives for Karma won't allow us to bundle workers and tests as ESM.
 // We should upgrade all CommonJS bundles to ESM as soon as the dynamic requires are resolved.
 
-const TARGET_BROWSER = ['chrome64', 'edge79', 'firefox62', 'safari11.1'];
+// https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md
+// Because emscripten 4.x requires BigInt support
+const TARGET_BROWSER = ['chrome67', 'edge79', 'firefox68', 'safari14'];
 const TARGET_BROWSER_TEST = ['es2020'];
 const TARGET_NODE = ['node14.6'];
 const EXTERNALS_NODE = ['apache-arrow'];
-const EXTERNALS_BROWSER = ['apache-arrow', 'module'];
-const EXTERNALS_WEBWORKER = ['module'];
-const EXTERNALS_TEST_BROWSER = ['module'];
+// "crypto" below are required for emscripten 4.x
+// because it has some code to check Node.js environment and use this module in Node.js env
+// ESBuild will throw errors if we do not add this config.
+const EXTERNALS_BROWSER = ['apache-arrow', 'module', 'crypto'];
+const EXTERNALS_WEBWORKER = ['module', 'crypto'];
+const EXTERNALS_TEST_BROWSER = ['module', 'crypto'];
 
 // Read CLI flags
 let is_debug = false;
