@@ -19,6 +19,6 @@
         "typeRoots": ["./types", "./node_modules/@types", "../../node_modules/@types"],
         "lib": ["es2022", "webworker", "dom"]
     },
-    "include": [".eslintrc.js", "./src/**/*", "./types/*.d.ts", "./test/**/*"],
+    "include": [".eslintrc.js", "./src/**/*", "./types/*.d.ts"],
     "exclude": ["./test/node/**/*"]
 }
