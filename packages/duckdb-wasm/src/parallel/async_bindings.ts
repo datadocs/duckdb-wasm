@@ -49,6 +49,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     protected _nextMessageId = 0;
     /** The pending requests */
     protected _pendingRequests: Map<number, WorkerTaskVariant> = new Map();
+    /** Shared cancel flag (index 0): main thread sets it, the worker's C++ ingest
+     *  scan polls it via Module.ddCancelFlag to interrupt a running query. Null
+     *  when SharedArrayBuffer is unavailable (page not cross-origin-isolated). */
+    protected _cancelFlag: Int32Array | null = null;
 
     constructor(logger: Logger, worker: Worker | null = null) {
         this._logger = logger;
@@ -359,7 +363,39 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             WorkerRequestType.INSTANTIATE,
             [mainModuleURL, pthreadWorkerURL],
         );
-        return await this.postTask(task);
+        const result = await this.postTask(task);
+        await this.setupCancelBuffer();
+        return result;
+    }
+
+    /** Allocate the shared cancel flag and hand it to the worker so the C++ ingest
+     *  scan can poll it mid-query. Needs a cross-origin-isolated context for
+     *  SharedArrayBuffer; silently no-ops otherwise, in which case cancel falls
+     *  back to the existing (poll-boundary) message path. */
+    protected async setupCancelBuffer(): Promise<void> {
+        if (typeof SharedArrayBuffer === 'undefined') return;
+        try {
+            const sab = new SharedArrayBuffer(4);
+            this._cancelFlag = new Int32Array(sab);
+            const task = new WorkerTask<WorkerRequestType.SET_CANCEL_BUFFER, SharedArrayBuffer, null>(
+                WorkerRequestType.SET_CANCEL_BUFFER,
+                sab,
+            );
+            await this.postTask(task);
+        } catch (e) {
+            this._cancelFlag = null;
+        }
+    }
+
+    /** Raise the shared cancel flag (read by the C++ scan). */
+    protected raiseCancelFlag(): void {
+        if (this._cancelFlag) Atomics.store(this._cancelFlag, 0, 1);
+    }
+
+    /** Clear the shared cancel flag at the start of a new query so a prior
+     *  cancel does not abort it. */
+    protected clearCancelFlag(): void {
+        if (this._cancelFlag) Atomics.store(this._cancelFlag, 0, 0);
     }
 
     /** Get the version */
@@ -415,6 +451,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Run a query */
     public async runQuery(conn: ConnectionID, text: string): Promise<Uint8Array> {
+        this.clearCancelFlag();
         const task = new WorkerTask<WorkerRequestType.RUN_QUERY, [ConnectionID, string], Uint8Array>(
             WorkerRequestType.RUN_QUERY,
             [conn, text],
@@ -428,6 +465,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         text: string,
         allowStreamResult: boolean = false,
     ): Promise<Uint8Array | null> {
+        this.clearCancelFlag();
         const task = new WorkerTask<
             WorkerRequestType.START_PENDING_QUERY,
             [ConnectionID, string, boolean],
@@ -445,6 +483,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     }
     /** Cancel a pending query */
     public async cancelPendingQuery(conn: ConnectionID): Promise<boolean> {
+        // Raise the shared flag FIRST: the worker may be synchronously blocked in a
+        // scan and unable to process the message below until it returns to its poll
+        // loop, but the C++ scan polls this flag directly and bails within a chunk.
+        this.raiseCancelFlag();
         const task = new WorkerTask<WorkerRequestType.CANCEL_PENDING_QUERY, ConnectionID, boolean>(
             WorkerRequestType.CANCEL_PENDING_QUERY,
             conn,

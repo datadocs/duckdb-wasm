@@ -3,6 +3,7 @@
 #include "duckdb/web/webdb.h"
 
 #include <emscripten/val.h>
+#include <emscripten/emscripten.h>
 
 #include <chrono>
 #include <cstddef>
@@ -54,6 +55,7 @@
 // #include "duckdb/web/extensions/fts_extension.h"
 #include "duckdb/web/extensions/json_extension.h"
 #include "duckdb/web/extensions/parquet_extension.h"
+#include "duckdb/web/extensions/sqlite_scanner_extension.h"
 #include "duckdb/web/functions/table_function_relation.h"
 #include "duckdb/web/http_wasm.h"
 #include "duckdb/web/io/arrow_ifstream.h"
@@ -267,6 +269,12 @@ bool WebDB::Connection::CancelPendingQuery() {
     // Only reset the pending query if it hasn't completed yet
     if (current_pending_query_result_ != nullptr && current_query_result_ == nullptr) {
         current_pending_query_was_canceled_ = true;
+        // Raise the interrupt flag as well: on its own the reset below only stops
+        // the NEXT poll, but Interrupt() makes the executor's per-chunk checks
+        // (pipeline_executor.cpp) throw InterruptException if a task is mid-flight.
+        // The flag is cleared at the start of the next query (client_context.cpp),
+        // so this cannot brick a later query.
+        connection_.Interrupt();
         current_pending_query_result_.reset();
         current_pending_statements_.clear();
         return true;
@@ -983,6 +991,7 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         auto db = make_shared_ptr<duckdb::DuckDB>(config_->path, &db_config);
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
+        duckdb_web_sqlite_scanner_init(db.get());
 #if defined(DUCKDB_JSON_EXTENSION)
         duckdb_web_json_init(db.get());
 #endif
@@ -1055,6 +1064,17 @@ arrow::Status WebDB::RegisterFileBuffer(std::string_view file_name, std::unique_
     // Unpin the file to re-register the new file.
     if (auto iter = pinned_web_files_.find(file_name); iter != pinned_web_files_.end()) {
         pinned_web_files_.erase(iter);
+    }
+    // Also write to Emscripten's MEMFS so that SQLite's default VFS (sqlite3_open_v2)
+    // can open the file. DuckDB's WebFileSystem and SQLite's VFS are separate.
+    {
+        const char* data_ptr = buffer.get();
+        size_t data_len = buffer_length;
+        std::string name_str(file_name);
+        EM_ASM({
+            var name = UTF8ToString($0);
+            try { FS.writeFile(name, HEAPU8.subarray($1, $1 + $2)); } catch(e) {}
+        }, name_str.c_str(), data_ptr, data_len);
     }
     // Register new file in web filesystem
     io::WebFileSystem::DataBuffer data{std::move(buffer), buffer_length};

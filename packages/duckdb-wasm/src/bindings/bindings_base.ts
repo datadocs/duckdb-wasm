@@ -239,6 +239,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     public cancelPendingQuery(conn: number): boolean {
         return this.mod.ccall('duckdb_web_pending_query_cancel', 'boolean', ['number'], [conn]);
     }
+    /** Bridge the shared cancel flag onto the module so the C++ ingest scan can
+     *  poll it (via EM_JS reading Module.ddCancelFlag) to interrupt a running
+     *  scan in the single-threaded WASM build. */
+    public configureCancelBuffer(buffer: SharedArrayBuffer): void {
+        (this.mod as any).ddCancelFlag = new Int32Array(buffer);
+    }
     /** Fetch query results */
     public fetchQueryResults(conn: number): Uint8Array | null {
         const [s, d, n] = callSRet(this.mod, 'duckdb_web_query_fetch_results', ['number'], [conn]);
