@@ -387,15 +387,13 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         }
     }
 
-    /** Raise the shared cancel flag (read by the C++ scan). */
+    /** Raise the shared cancel flag (read by the C++ scan). The flag is NOT
+     *  cleared here on query start — that happens WORKER-side when the next
+     *  query begins executing (bindings_base.resetCancelFlagForNewQuery), so a
+     *  raise can never be wiped by a query that is merely queued behind the
+     *  one being cancelled. */
     protected raiseCancelFlag(): void {
         if (this._cancelFlag) Atomics.store(this._cancelFlag, 0, 1);
-    }
-
-    /** Clear the shared cancel flag at the start of a new query so a prior
-     *  cancel does not abort it. */
-    protected clearCancelFlag(): void {
-        if (this._cancelFlag) Atomics.store(this._cancelFlag, 0, 0);
     }
 
     /** Get the version */
@@ -451,7 +449,6 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Run a query */
     public async runQuery(conn: ConnectionID, text: string): Promise<Uint8Array> {
-        this.clearCancelFlag();
         const task = new WorkerTask<WorkerRequestType.RUN_QUERY, [ConnectionID, string], Uint8Array>(
             WorkerRequestType.RUN_QUERY,
             [conn, text],
@@ -465,7 +462,6 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         text: string,
         allowStreamResult: boolean = false,
     ): Promise<Uint8Array | null> {
-        this.clearCancelFlag();
         const task = new WorkerTask<
             WorkerRequestType.START_PENDING_QUERY,
             [ConnectionID, string, boolean],

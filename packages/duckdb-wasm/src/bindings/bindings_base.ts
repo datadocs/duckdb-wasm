@@ -174,8 +174,19 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
     }
 
+    /** Reset the shared cancel flag before a new query starts executing. Runs in
+     *  the WORKER (execution is serialized here), so a flag raised to cancel the
+     *  currently-running query can never be wiped by another query being merely
+     *  QUEUED — the reset for the next query only happens once the worker gets
+     *  to it, i.e. after the cancelled query has actually died. */
+    protected resetCancelFlagForNewQuery(): void {
+        const flag = (this.mod as any).ddCancelFlag as Int32Array | undefined;
+        if (flag) Atomics.store(flag, 0, 0);
+    }
+
     /** Send a query and return the full result */
     public runQuery(conn: number, text: string): Uint8Array {
+        this.resetCancelFlagForNewQuery();
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = this.mod._malloc(BUF.length);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
@@ -201,6 +212,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
      *  Results can then be fetched using `fetchQueryResults`
      */
     public startPendingQuery(conn: number, text: string, allowStreamResult: boolean = false): Uint8Array | null {
+        this.resetCancelFlagForNewQuery();
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = this.mod._malloc(BUF.length);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
