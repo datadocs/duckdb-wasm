@@ -33,3 +33,6 @@
 	url = https://github.com/datadocs/duckdb.git
 	branch = ingest-v1.3.1-cancel
 	shallow = true
+[submodule "submodules/sqlite_scanner"]
+	path = submodules/sqlite_scanner
+	url = https://github.com/datadocs/sqlite_scanner.git
