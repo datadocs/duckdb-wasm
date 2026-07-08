@@ -477,12 +477,41 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         );
         return await this.postTask(task);
     }
+    /** True when this connection has a query/poll request outstanding — i.e.
+     *  the worker is (or is about to be) executing on its behalf. */
+    protected connHasQueryInFlight(conn: ConnectionID): boolean {
+        for (const task of this._pendingRequests.values()) {
+            switch (task.type as WorkerRequestType) {
+                case WorkerRequestType.RUN_QUERY:
+                case WorkerRequestType.START_PENDING_QUERY:
+                    if ((task.data as [ConnectionID])[0] === conn) return true;
+                    break;
+                case WorkerRequestType.POLL_PENDING_QUERY:
+                case WorkerRequestType.FETCH_QUERY_RESULTS:
+                    if (task.data === conn) return true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        return false;
+    }
+
     /** Cancel a pending query */
     public async cancelPendingQuery(conn: ConnectionID): Promise<boolean> {
-        // Raise the shared flag FIRST: the worker may be synchronously blocked in a
-        // scan and unable to process the message below until it returns to its poll
-        // loop, but the C++ scan polls this flag directly and bails within a chunk.
-        this.raiseCancelFlag();
+        // Raise the shared flag FIRST: the worker may be synchronously blocked in
+        // a scan and unable to process the message below until it returns to its
+        // poll loop; the C++ scan polls this flag directly and bails mid-chunk.
+        //
+        // ONLY when this connection actually has a query in flight. cancelSent is
+        // also called as ROUTINE CLEANUP when closing idle connections (e.g.
+        // after every completed forwarded cross-tab query) — an unconditional
+        // raise turned each of those closes into a kill signal aimed at whatever
+        // innocent query happened to be running, so two tabs' background traffic
+        // endlessly killed each other's scans.
+        if (this.connHasQueryInFlight(conn)) {
+            this.raiseCancelFlag();
+        }
         const task = new WorkerTask<WorkerRequestType.CANCEL_PENDING_QUERY, ConnectionID, boolean>(
             WorkerRequestType.CANCEL_PENDING_QUERY,
             conn,
