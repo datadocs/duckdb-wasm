@@ -31,5 +31,5 @@
 [submodule "submodules/duckdb"]
 	path = submodules/duckdb
 	url = https://github.com/datadocs/duckdb.git
-	branch = ingest-v1.3.1
+	branch = ingest-v1.3.1-cancel
 	shallow = true
