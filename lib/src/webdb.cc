@@ -2,8 +2,8 @@
 
 #include "duckdb/web/webdb.h"
 
-#include <emscripten/val.h>
 #include <emscripten/emscripten.h>
+#include <emscripten/val.h>
 
 #include <chrono>
 #include <cstddef>
@@ -55,6 +55,7 @@
 // #include "duckdb/web/extensions/fts_extension.h"
 #include "duckdb/web/extensions/json_extension.h"
 #include "duckdb/web/extensions/parquet_extension.h"
+#include "duckdb/web/extensions/sqlite_extension.h"
 #include "duckdb/web/functions/table_function_relation.h"
 #include "duckdb/web/http_wasm.h"
 #include "duckdb/web/io/arrow_ifstream.h"
@@ -990,6 +991,7 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         auto db = make_shared_ptr<duckdb::DuckDB>(config_->path, &db_config);
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
+        duckdb_web_sqlite_init(db.get());
 #if defined(DUCKDB_JSON_EXTENSION)
         duckdb_web_json_init(db.get());
 #endif
@@ -1069,10 +1071,15 @@ arrow::Status WebDB::RegisterFileBuffer(std::string_view file_name, std::unique_
         const char* data_ptr = buffer.get();
         size_t data_len = buffer_length;
         std::string name_str(file_name);
-        EM_ASM({
-            var name = UTF8ToString($0);
-            try { FS.writeFile(name, HEAPU8.subarray($1, $1 + $2)); } catch(e) {}
-        }, name_str.c_str(), data_ptr, data_len);
+        EM_ASM(
+            {
+                var name = UTF8ToString($0);
+                try {
+                    FS.writeFile(name, HEAPU8.subarray($1, $1 + $2));
+                } catch (e) {
+                }
+            },
+            name_str.c_str(), data_ptr, data_len);
     }
     // Register new file in web filesystem
     io::WebFileSystem::DataBuffer data{std::move(buffer), buffer_length};

@@ -15,6 +15,10 @@ endif()
 set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
+# Out-of-tree extensions (eg. `sqlite_scanner`) can't be added into `DUCKDB_EXTENSIONS`,
+# because `BUILD_EXTENSIONS` only accepts extensions located in the `duckdb/extension` directory.
+# They are loaded through the extension config file below instead.
+set(DUCKDB_EXTENSION_CONFIG_FILE "${CMAKE_CURRENT_LIST_DIR}/duckdb_extension_config.cmake")
 set(DUCKDB_EXTENSIONS "json;core_functions")
 if(ENABLE_DATADOCS_EXTENSION)
   set(DUCKDB_EXTENSIONS "${DUCKDB_EXTENSIONS};datadocs")
@@ -43,6 +47,7 @@ ExternalProject_Add(
              -DCMAKE_BUILD_TYPE=${DUCKDB_BUILD_TYPE}
              -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
              -DBUILD_EXTENSIONS=${DUCKDB_EXTENSIONS_PACKED}
+             -DDUCKDB_EXTENSION_CONFIGS=${DUCKDB_EXTENSION_CONFIG_FILE}
              -DSKIP_EXTENSIONS=jemalloc
              -DBUILD_SHELL=FALSE
              -DBUILD_UNITTESTS=FALSE
@@ -71,7 +76,8 @@ ExternalProject_Add(
     <INSTALL_DIR>/lib/libzlib.a
     # <INSTALL_DIR>/lib/libexcel_extension.a
     <INSTALL_DIR>/lib/libjson_extension.a
-    <INSTALL_DIR>/lib/libdatadocs_extension.a)
+    <INSTALL_DIR>/lib/libdatadocs_extension.a
+    <INSTALL_DIR>/lib/libsqlite_scanner_extension.a)
 
 ExternalProject_Get_Property(duckdb_ep install_dir)
 ExternalProject_Get_Property(duckdb_ep binary_dir)
@@ -139,6 +145,13 @@ if(ENABLE_DATADOCS_EXTENSION)
   add_dependencies(duckdb_datadocs duckdb_ep)
 endif()
 
+# NOTE: the target/library name of the sqlite extension is `sqlite_scanner_extension`,
+# it is defined in `submodules/duckdb-sqlite/CMakeLists.txt`.
+add_library(duckdb_sqlite STATIC IMPORTED)
+set_property(TARGET duckdb_sqlite PROPERTY IMPORTED_LOCATION ${install_dir}/lib/libsqlite_scanner_extension.a)
+target_include_directories(duckdb_sqlite INTERFACE ${CMAKE_SOURCE_DIR}/../submodules/duckdb-sqlite/src/include)
+
 add_dependencies(duckdb duckdb_ep)
 add_dependencies(duckdb_parquet duckdb_ep)
 add_dependencies(duckdb_json duckdb_ep)
+add_dependencies(duckdb_sqlite duckdb_ep)

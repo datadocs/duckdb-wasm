@@ -10,10 +10,11 @@
 # Usage:   datadocs_fast_rebuild.sh [--release] [--duckdb] [...features]
 # Options: please read the `usage` function below for details
 # Author:  Liu Yue @hangxingliu
-# Version: 2025-06-24
+# Version: 2026-07-31
 #
 throw() { echo -e "fatal: $1" >&2; exit 1; }
-execute() { echo "$ $*"; "$@" || throw "Failed to execute '$1'"; }
+print_cmd() { printf "\$ %s\n" "$*"; }
+execute() { print_cmd "$@"; "$@" || throw "Failed to execute '$1'"; }
 usage() {
   local bin;
   bin="$(basename "${BASH_SOURCE[0]}")";

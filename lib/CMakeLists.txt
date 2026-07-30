@@ -4,7 +4,7 @@ if(POLICY CMP0048)
 endif(POLICY CMP0048)
 
 project(duckdb_wasm VERSION 0.1)
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.25)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -307,6 +307,10 @@ else()
     ${CMAKE_SOURCE_DIR}/src/extensions/parquet_extension.cc)
 
   add_library(
+    duckdb_web_sqlite
+    ${CMAKE_SOURCE_DIR}/src/extensions/sqlite_extension.cc)
+
+  add_library(
     duckdb_web_json
     ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
 
@@ -342,9 +346,10 @@ else()
   endif()
 
   # duckdb_web_fts
-  target_link_libraries(duckdb_web duckdb duckdb_web_parquet ${DUCKDB_WEB_JSON} arrow ${DUCKDB_WEB_DATADOCS} rapidjson ${THREAD_LIBS})
+  target_link_libraries(duckdb_web duckdb duckdb_web_parquet duckdb_web_sqlite ${DUCKDB_WEB_JSON} arrow ${DUCKDB_WEB_DATADOCS} rapidjson ${THREAD_LIBS})
   # target_link_libraries(duckdb_web_fts duckdb duckdb_fts)
   target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
+  target_link_libraries(duckdb_web_sqlite duckdb duckdb_sqlite)
   # target_link_libraries(duckdb_web_excel duckdb duckdb_excel)
   target_link_libraries(duckdb_web_json duckdb duckdb_json)
   if(ENABLE_DATADOCS_EXTENSION)
