@@ -19,6 +19,7 @@ export interface DuckDBBindings {
     startPendingQuery(conn: number, text: string, allowStreamResult: boolean): Uint8Array | null;
     pollPendingQuery(conn: number): Uint8Array | null;
     cancelPendingQuery(conn: number): boolean;
+    configureCancelBuffer(buffer: SharedArrayBuffer): void;
     fetchQueryResults(conn: number): Uint8Array | null;
     getTableNames(conn: number, text: string): string[];
     ingestGetSchema(conn: number, fileName: string, path: string): string;

@@ -303,6 +303,13 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     );
                     break;
                 }
+                case WorkerRequestType.SET_CANCEL_BUFFER: {
+                    // Bridge the shared cancel flag onto the emscripten Module so the
+                    // C++ ingest scan can poll it (Module.ddCancelFlag) mid-query.
+                    this._bindings.configureCancelBuffer(request.data);
+                    this.sendOK(request);
+                    break;
+                }
                 case WorkerRequestType.FETCH_QUERY_RESULTS: {
                     const result = this._bindings.fetchQueryResults(request.data);
                     const transfer = result ? [result.buffer] : [];

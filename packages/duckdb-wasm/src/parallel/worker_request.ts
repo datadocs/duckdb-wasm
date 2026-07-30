@@ -12,6 +12,7 @@ export type StatementID = number;
 
 export enum WorkerRequestType {
     CANCEL_PENDING_QUERY = 'CANCEL_PENDING_QUERY',
+    SET_CANCEL_BUFFER = 'SET_CANCEL_BUFFER',
     CLOSE_PREPARED = 'CLOSE_PREPARED',
     COLLECT_FILE_STATISTICS = 'COLLECT_FILE_STATISTICS',
     REGISTER_OPFS_FILE_NAME = 'REGISTER_OPFS_FILE_NAME',
@@ -112,6 +113,7 @@ export class WorkerTask<T, D, P> {
 export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.CLOSE_PREPARED, [ConnectionID, StatementID]>
     | WorkerRequest<WorkerRequestType.CANCEL_PENDING_QUERY, number>
+    | WorkerRequest<WorkerRequestType.SET_CANCEL_BUFFER, SharedArrayBuffer>
     | WorkerRequest<WorkerRequestType.COLLECT_FILE_STATISTICS, [string, boolean]>
     | WorkerRequest<WorkerRequestType.REGISTER_OPFS_FILE_NAME, [string]>
     | WorkerRequest<WorkerRequestType.CONNECT, null>
@@ -217,4 +219,5 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.START_PENDING_QUERY, [ConnectionID, string, boolean], Uint8Array | null>
     | WorkerTask<WorkerRequestType.POLL_PENDING_QUERY, ConnectionID, Uint8Array | null>
     | WorkerTask<WorkerRequestType.CANCEL_PENDING_QUERY, ConnectionID, boolean>
+    | WorkerTask<WorkerRequestType.SET_CANCEL_BUFFER, SharedArrayBuffer, null>
     | WorkerTask<WorkerRequestType.TOKENIZE, string, ScriptTokens>;
