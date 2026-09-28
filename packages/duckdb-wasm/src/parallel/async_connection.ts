@@ -82,8 +82,8 @@ export class AsyncDuckDBConnection {
     }
 
     /** Get ingest schema for file */
-    public async ingestGetSchema(query: string, path: string): Promise<string> {
-        return await this._bindings.ingestGetSchema(this._conn, query, path);
+    public async ingestGetSchema(query: string, path: string, options?: string): Promise<string> {
+        return await this._bindings.ingestGetSchema(this._conn, query, path, options);
     }
 
     /** Create a prepared statement */

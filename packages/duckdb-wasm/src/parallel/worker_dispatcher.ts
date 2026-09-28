@@ -338,7 +338,12 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     break;
                 }
                 case WorkerRequestType.INGEST_GET_SCHEMA: {
-                    const result = this._bindings.ingestGetSchema(request.data[0], request.data[1], request.data[2]);
+                    const result = this._bindings.ingestGetSchema(
+                        request.data[0],
+                        request.data[1],
+                        request.data[2],
+                        request.data[3],
+                    );
                     this.postMessage(
                         {
                             messageId: this._nextMessageId++,

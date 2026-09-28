@@ -383,11 +383,13 @@ arrow::Result<std::string> WebDB::Connection::GetTableNames(std::string_view tex
     }
 }
 
-/// Fetch table names
-arrow::Result<std::string> WebDB::Connection::IngestGetSchema(std::string_view fileName, std::string_view path) {
+/// Get the ingest schema of a file
+arrow::Result<std::string> WebDB::Connection::IngestGetSchema(std::string_view fileName, std::string_view path,
+                                                              std::string_view options) {
     try {
         rapidjson::Document doc;
-        auto file_schema = ingest_get_schema(connection_, std::string{fileName}, std::string(path));
+        auto file_schema =
+            ingest_get_schema(connection_, std::string{fileName}, std::string(path), std::string(options));
         return file_schema;
     } catch (std::exception& e) {
         return arrow::Status{arrow::StatusCode::ExecutionError, e.what()};

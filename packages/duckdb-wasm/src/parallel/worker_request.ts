@@ -128,7 +128,7 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.FLUSH_FILES, null>
     | WorkerRequest<WorkerRequestType.GET_FEATURE_FLAGS, null>
     | WorkerRequest<WorkerRequestType.GET_TABLE_NAMES, [number, string]>
-    | WorkerRequest<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string]>
+    | WorkerRequest<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string, string | undefined]>
     | WorkerRequest<WorkerRequestType.GET_VERSION, null>
     | WorkerRequest<WorkerRequestType.GLOB_FILE_INFOS, string>
     | WorkerRequest<
@@ -196,7 +196,7 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.FLUSH_FILES, null, null>
     | WorkerTask<WorkerRequestType.GET_FEATURE_FLAGS, null, number>
     | WorkerTask<WorkerRequestType.GET_TABLE_NAMES, [number, string], string[]>
-    | WorkerTask<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string], string>
+    | WorkerTask<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string, string | undefined], string>
     | WorkerTask<WorkerRequestType.GET_VERSION, null, string>
     | WorkerTask<
           WorkerRequestType.INSERT_ARROW_FROM_IPC_STREAM,

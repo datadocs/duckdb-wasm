@@ -258,9 +258,11 @@ void duckdb_web_get_tablenames_buffer(WASMResponse* packed, ConnectionHdl connHd
 }
 
 /// Get Ingest Schema for a file
-void duckdb_web_ingest_get_schema(WASMResponse* packed, ConnectionHdl connHdl, const char* fileName, const char* path) {
+void duckdb_web_ingest_get_schema(WASMResponse* packed, ConnectionHdl connHdl, const char* fileName, const char* path,
+                                  const char* options) {
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
-    auto r = c->IngestGetSchema(fileName, path);
+    // A caller built against the three-argument binding passes no options.
+    auto r = c->IngestGetSchema(fileName, path, options ? std::string_view{options} : std::string_view{});
     WASMResponseBuffer::Get().Store(*packed, std::move(r));
 }
 

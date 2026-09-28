@@ -74,8 +74,8 @@ export class DuckDBConnection {
     }
 
     /** Ingest get schema for file */
-    public ingestGetSchema(fileName: string, path: string): string {
-        return this._bindings.ingestGetSchema(this._conn, fileName, path);
+    public ingestGetSchema(fileName: string, path: string, options?: string): string {
+        return this._bindings.ingestGetSchema(this._conn, fileName, path, options);
     }
 
     /** Create a prepared statement */

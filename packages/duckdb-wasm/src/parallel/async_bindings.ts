@@ -538,11 +538,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     }
 
     /** Get Ingest Schema for file */
-    public async ingestGetSchema(conn: number, fileName: string, path: string): Promise<string> {
-        const task = new WorkerTask<WorkerRequestType.INGEST_GET_SCHEMA, [number, string, string], string>(
+    public async ingestGetSchema(conn: number, fileName: string, path: string, options?: string): Promise<string> {
+        const task = new WorkerTask<
             WorkerRequestType.INGEST_GET_SCHEMA,
-            [conn, fileName, path],
-        );
+            [number, string, string, string | undefined],
+            string
+        >(WorkerRequestType.INGEST_GET_SCHEMA, [conn, fileName, path, options]);
         return await this.postTask(task);
     }
 

@@ -118,8 +118,10 @@ class WebDB {
         DuckDBWasmResultsWrapper FetchQueryResults();
         /// Get table names
         arrow::Result<std::string> GetTableNames(std::string_view text);
-        /// Get table names
-        arrow::Result<std::string> IngestGetSchema(std::string_view text, std::string_view path);
+        /// Get the ingest schema of a file. `options` is a JSON object of reader options
+        /// (`sample_rows`, `narrow_integers`), or empty for the defaults.
+        arrow::Result<std::string> IngestGetSchema(std::string_view text, std::string_view path,
+                                                   std::string_view options = {});
 
         /// Prepare a statement and return its identifier
         arrow::Result<size_t> CreatePreparedStatement(std::string_view text);

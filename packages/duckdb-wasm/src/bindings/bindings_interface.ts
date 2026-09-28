@@ -22,7 +22,7 @@ export interface DuckDBBindings {
     configureCancelBuffer(buffer: SharedArrayBuffer): void;
     fetchQueryResults(conn: number): Uint8Array | null;
     getTableNames(conn: number, text: string): string[];
-    ingestGetSchema(conn: number, fileName: string, path: string): string;
+    ingestGetSchema(conn: number, fileName: string, path: string, options?: string): string;
 
     createPrepared(conn: number, text: string): number;
     closePrepared(conn: number, statement: number): void;

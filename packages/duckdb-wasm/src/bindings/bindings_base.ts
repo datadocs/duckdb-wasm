@@ -301,13 +301,18 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         dropResponseBuffers(this.mod);
         return JSON.parse(res) as string[];
     }
-    /** Get Ingest Schema for a file */
-    public ingestGetSchema(conn: number, fileName: string, path: string): string {
+    /**
+     * Get Ingest Schema for a file.
+     *
+     * `options` is a JSON object of reader options: `sample_rows` (the rows the column types are
+     * inferred from, 100 by default) and `narrow_integers` (infer integer types narrower than 64 bits).
+     */
+    public ingestGetSchema(conn: number, fileName: string, path: string, options?: string): string {
         const [s, d, n] = callSRet(
             this.mod,
             'duckdb_web_ingest_get_schema',
-            ['number', 'string', 'string'],
-            [conn, fileName, path],
+            ['number', 'string', 'string', 'string'],
+            [conn, fileName, path, options ?? ''],
         );
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
